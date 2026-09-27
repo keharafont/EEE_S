@@ -3,12 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>映すラジオ：QRで音を送る v3</title>
+<title>映すラジオ：QRで音を送る v3.2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.4/dist/iife/reader/index.js"></script>
 <style>
 :root{
   --bg:#e6e8ea; --ink:#1c2127; --muted:#5d6670; --line:#c3c9cf; --panel:#f1f2f3;
@@ -217,6 +218,12 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
       <label class="field">カメラ
         <select id="cam"><option value="">背面（自動）</option></select>
       </label>
+      <label class="field">デコーダ
+        <select id="decoder">
+          <option value="zxing" selected>ZXing（WASM・推奨）</option>
+          <option value="jsqr">jsQR（v2まで）</option>
+        </select>
+      </label>
       <label class="field">読み取り解像度（長辺）
         <select id="res">
           <option value="800">800 px（v2と同じ）</option>
@@ -251,6 +258,7 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
       <div class="stat"><b id="rDelay">–</b><span>遅延（秒）</span></div>
       <div class="stat"><b id="rCodec">–</b><span>受信中の方式</span></div>
       <div class="stat"><b id="rCam">–</b><span>カメラ／解析</span></div>
+      <div class="stat"><b id="rDec">–</b><span>デコーダ／1回の時間</span></div>
     </div>
     <p class="note">QRが画面の半分以上を占めるようにカメラを向けてください。バッファ時間は送信側の設定に従います。解像度・切り出し・ズームは受信中でも変えられます（解像度を上げると試行／秒が下がります）。「中央切り出し」はカメラの元画像の中央だけを解析するので、離れた位置からでも1モジュールあたりの画素数を稼げます。カメラのズームはブラウザが対応している場合だけ表示されます。iPhoneは消音モードを解除してください。</p>
   </section>
@@ -261,6 +269,8 @@ const $ = s => document.querySelector(s);
 const FRAME_US = 20000, FRAME_SEC = 0.02;
 const CODEC_OPUS = 1, CODEC_ADPCM = 2;
 const hasWC = typeof AudioEncoder !== 'undefined' && typeof AudioDecoder !== 'undefined';
+/* ZXing の WASM を先に読み込んでおく（.wasm は jsDelivr から自動取得） */
+if (typeof ZXingWASM !== 'undefined'){ try { ZXingWASM.prepareZXingModule({ fireImmediately:true }); } catch {} }
 
 /* ---------- presets ---------- */
 const PRESETS = [
@@ -608,7 +618,13 @@ async function startRx(){
     r.dec = new AudioDecoder({ output: ad => onDecoded(r, ad), error: e => { $('#rxErr').textContent = 'デコードエラー：' + e.message; } });
     r.dec.configure({ codec:'opus', sampleRate:48000, numberOfChannels:1 });
   }
-  const loop = () => { if (rx !== r) return; scan(r); r.raf = requestAnimationFrame(loop); };
+  r.zx = typeof ZXingWASM !== 'undefined';
+  if (!r.zx){ $('#decoder').value = 'jsqr'; $('#decoder').disabled = true; }
+  const loop = async () => {
+    if (rx !== r) return;
+    if (!r.busy){ r.busy = true; try { await scan(r); } catch {} r.busy = false; }
+    if (rx === r) r.raf = requestAnimationFrame(loop);
+  };
   loop();
   r.tick = setInterval(() => schedule(r), 40);
   r.ui = setInterval(() => rxStats(r), 300);
@@ -649,7 +665,8 @@ function updateGuide(){
   g.style.width = (vw / crop) + 'px'; g.style.height = (vh / crop) + 'px'; g.hidden = false;
 }
 $('#crop').onchange = updateGuide; window.addEventListener('resize', updateGuide);
-function scan(r){
+const ZX_OPTS = { formats:['QRCode'], tryHarder:true, tryRotate:true, tryInvert:false, tryDownscale:true, maxNumberOfSymbols:1 };
+async function scan(r){
   const v = $('#video');
   if (v.readyState < 2 || !v.videoWidth) return;
   if (!r.guided){ r.guided = true; updateGuide(); }
@@ -663,8 +680,19 @@ function scan(r){
   const img = r.g.getImageData(0, 0, w, h);
   r.scans.push(performance.now());
   r.camInfo = v.videoWidth + '×' + v.videoHeight + (crop > 1 ? ' 中央1/' + crop : '') + ' → ' + w + '×' + h;
-  const res = jsQR(img.data, w, h, { inversionAttempts:'dontInvert' });
-  if (res && res.binaryData && res.binaryData.length) onPacket(r, Uint8Array.from(res.binaryData));
+  const useZx = r.zx && $('#decoder').value === 'zxing', t0 = performance.now();
+  let bytes = null;
+  if (useZx){
+    const rr = await ZXingWASM.readBarcodes(img, ZX_OPTS);
+    const hit = rr.find(x => x.isValid && x.bytes && x.bytes.length);
+    if (hit) bytes = hit.bytes;
+  } else {
+    const res = jsQR(img.data, w, h, { inversionAttempts:'dontInvert' });
+    if (res && res.binaryData && res.binaryData.length) bytes = Uint8Array.from(res.binaryData);
+  }
+  r.decMs = r.decMs == null ? performance.now() - t0 : r.decMs * 0.9 + (performance.now() - t0) * 0.1;
+  r.decName = useZx ? 'ZXing' : 'jsQR';
+  if (bytes) onPacket(r, bytes);
 }
 function chunkSecOf(p, c){
   if (p.codec === CODEC_ADPCM) return ((c.data.length - 3) * 2) / p.rate;
@@ -763,6 +791,7 @@ function rxStats(r){
   $('#rRead').textContent = (r.recent.length / 2).toFixed(1);
   $('#rScan').textContent = (r.scans.length / 2).toFixed(1);
   if (r.camInfo) $('#rCam').textContent = r.camInfo;
+  if (r.decName) $('#rDec').textContent = r.decName + ' ' + Math.round(r.decMs) + 'ms';
   if (r.hist) r.hist = r.hist.filter(h => now - h.t < 15000);
   const signal = r.actx.currentTime - r.lastRecv < 1.5;
   if (r.started && signal && r.hist && r.hist.length){
@@ -778,7 +807,7 @@ function stopRx(){
   $('#rxBtn').textContent = '受信を開始'; $('#rxBtn').classList.remove('stop');
   $('#rxIdle').hidden = false; $('#guide').hidden = true; $('#zoomBox').hidden = true;
   if (!r) return;
-  cancelAnimationFrame(r.raf); clearInterval(r.tick); clearInterval(r.ui);
+  cancelAnimationFrame(r.raf); clearInterval(r.tick); clearInterval(r.ui); r.busy = true;
   r.stream?.getTracks().forEach(t => t.stop());
   $('#video').srcObject = null;
   try { r.dec?.close(); } catch {}
