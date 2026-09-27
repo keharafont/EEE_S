@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>映すラジオ：QRで音を送る v3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<style>
+:root{
+  --bg:#e6e8ea; --ink:#1c2127; --muted:#5d6670; --line:#c3c9cf; --panel:#f1f2f3;
+  --accent:#0f6b5c; --accent-ink:#ffffff; --warn:#a4461b;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#161b20; --ink:#e3e6e8; --muted:#8b949c; --line:#2e373f; --panel:#1d2329;
+    --accent:#4fc3a9; --accent-ink:#0c1a17; --warn:#f08a5d;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#161b20; --ink:#e3e6e8; --muted:#8b949c; --line:#2e373f; --panel:#1d2329;
+  --accent:#4fc3a9; --accent-ink:#0c1a17; --warn:#f08a5d;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  font-size:16px; line-height:1.6; -webkit-text-size-adjust:100%;
+}
+main{max-width:640px; margin:0 auto; padding:20px 16px 40px}
+h1{font-size:28px; line-height:1.2; margin:4px 0 4px; letter-spacing:.02em}
+.lede{margin:0 0 20px; color:var(--muted); font-size:15px}
+.seg{display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--line); border-radius:10px; overflow:hidden; margin-bottom:20px}
+.seg button{appearance:none; border:0; background:transparent; color:var(--ink); font:inherit; font-weight:700; padding:12px; cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink); color:var(--bg)}
+.row{display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px}
+label.field{display:flex; flex-direction:column; gap:4px; font-size:13px; color:var(--muted); flex:1 1 150px}
+select,input[type=file]{font:inherit; font-size:15px; color:var(--ink); background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:9px 10px; width:100%}
+.check{display:flex; align-items:center; gap:8px; font-size:14px; color:var(--muted)}
+.go{appearance:none; border:0; border-radius:10px; background:var(--accent); color:var(--accent-ink); font:inherit; font-weight:700; font-size:17px; padding:14px; width:100%; cursor:pointer; margin:4px 0 16px}
+.go.stop{background:var(--ink); color:var(--bg)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--accent); outline-offset:2px}
+.dial{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:12px}
+.dial .hd{display:flex; justify-content:space-between; align-items:baseline; font-size:13px; color:var(--muted)}
+.dial .hd b{font-size:18px; color:var(--ink)}
+.dial input[type=range]{width:100%; margin:8px 0 2px; accent-color:var(--accent)}
+.dial .ends{display:flex; justify-content:space-between; font-size:12px; color:var(--muted)}
+.dial .desc{font-size:13px; color:var(--muted); margin-top:4px; font-variant-numeric:tabular-nums}
+details{border:1px solid var(--line); border-radius:10px; padding:8px 14px; margin-bottom:12px}
+summary{cursor:pointer; font-size:14px; color:var(--muted); padding:4px 0}
+details .row{margin-top:10px}
+.stage{position:relative; background:#fff; border-radius:12px; padding:12px; display:flex; justify-content:center; align-items:center; min-height:200px; border:3px solid transparent; transition:border-color .12s, background-color .3s}
+.stage.hit{border-color:var(--accent)}
+.stage.vinyl{background:#0b0908}
+#qr{width:100%; max-width:min(92vw,560px); aspect-ratio:1; display:block; transform-origin:50% 50%}
+#qr.plain{image-rendering:pixelated}
+/* v3: 回転はCSSアニメーションではなく、QR切り替えごとの離散回転（コマ送り）。表示中は静止させて動きブレを避ける */
+.stage.cam{background:#000; padding:0; overflow:hidden}
+video{width:100%; display:block; max-height:60vh; object-fit:contain}
+.idle{color:#6b737b; font-size:14px; text-align:center; padding:24px}
+.meter{height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin:12px 0 8px}
+.meter i{display:block; height:100%; width:0; background:var(--accent)}
+.stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:10px; margin-top:12px}
+.stat{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 10px}
+.stat b{display:block; font-size:22px; font-variant-numeric:tabular-nums; line-height:1.3}
+.stat span{font-size:12px; color:var(--muted)}
+.note{font-size:13px; color:var(--muted); margin-top:14px}
+.err{color:var(--warn); font-size:14px; margin:8px 0; min-height:1em}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+  <h1>映すラジオ</h1>
+  <p class="lede">画面に流れるQRコードの光だけで音声を送ります。ネットワークは使いません。</p>
+
+  <div class="seg" role="group" aria-label="モード">
+    <button id="tabTx" aria-pressed="true">送信する</button>
+    <button id="tabRx" aria-pressed="false">受信する</button>
+  </div>
+
+  <section id="txPanel">
+    <div class="row">
+      <label class="field">音源
+        <select id="src">
+          <option value="mic">マイク</option>
+          <option value="file">音声ファイル（ループ）</option>
+        </select>
+      </label>
+      <label class="field">方式
+        <select id="codec">
+          <option value="adpcm" selected>ADPCM（iPhone受信可）</option>
+          <option value="opus12">Opus 12kbps（PC受信のみ）</option>
+          <option value="opus16">Opus 16kbps（PC受信のみ）</option>
+        </select>
+      </label>
+    </div>
+    <div class="row" id="fileRow" hidden>
+      <label class="field">ファイル
+        <input type="file" id="file" accept="audio/*">
+      </label>
+      <label class="check"><input type="checkbox" id="monitor"> 送信側でも鳴らす</label>
+    </div>
+
+    <div class="dial" id="dialBox">
+      <div class="hd"><span>音質ダイヤル</span><b id="dialName">電話</b></div>
+      <input type="range" id="dial" min="0" max="3" step="1" value="1" aria-label="音質">
+      <div class="ends"><span>蝋管</span><span>AMラジオ</span></div>
+      <div class="desc" id="dialDesc"></div>
+    </div>
+
+    <div class="row">
+      <label class="field">見た目
+        <select id="look">
+          <option value="record" selected>レコード盤</option>
+          <option value="plain">QRのみ（白地）</option>
+        </select>
+      </label>
+      <label class="field">回転（コマ送り）
+        <select id="rpm">
+          <option value="0">止める</option>
+          <option value="16">16回転</option>
+          <option value="33" selected>33回転</option>
+          <option value="45">45回転</option>
+        </select>
+      </label>
+      <label class="field">ドット
+        <select id="dots">
+          <option value="round" selected>丸</option>
+          <option value="square">四角</option>
+        </select>
+      </label>
+      <label class="field">色
+        <select id="tone">
+          <option value="sepia" selected>セピア</option>
+          <option value="mono">黒白</option>
+        </select>
+      </label>
+    </div>
+
+    <details>
+      <summary>詳細設定（ダイヤルで自動設定。変えると「カスタム」になります）</summary>
+      <div class="row">
+        <label class="field">サンプリングレート
+          <select id="rate">
+            <option value="3000">3 kHz</option>
+            <option value="4000">4 kHz</option>
+            <option value="6000">6 kHz</option>
+            <option value="8000">8 kHz</option>
+          </select>
+        </label>
+        <label class="field">チャンク長
+          <select id="chunk">
+            <option value="0.24">0.24 秒</option>
+            <option value="0.32">0.32 秒</option>
+            <option value="0.48">0.48 秒</option>
+          </select>
+        </label>
+        <label class="field">冗長度
+          <select id="red">
+            <option value="2">2倍（直前も入れる）</option>
+            <option value="3">3倍（直前2つ）</option>
+            <option value="1">1倍（冗長なし）</option>
+          </select>
+        </label>
+        <label class="field">誤り訂正
+          <select id="ec">
+            <option value="L">L（7%）</option>
+            <option value="M">M（15%）</option>
+          </select>
+        </label>
+        <label class="field">遅延（受信側バッファ）
+          <select id="buf">
+            <option value="1.0">1.0 秒</option>
+            <option value="1.5">1.5 秒</option>
+            <option value="2.0">2.0 秒</option>
+            <option value="3.0">3.0 秒</option>
+            <option value="4.0">4.0 秒</option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" id="fixver" checked> QRの大きさを固定する</label>
+      </div>
+    </details>
+
+    <button class="go" id="txBtn">送信を開始</button>
+    <p class="err" id="txErr"></p>
+    <div class="stage" id="txStage">
+      <canvas id="qr" hidden></canvas>
+      <div class="idle" id="txIdle">ここにQRコードが表示されます</div>
+    </div>
+    <div class="meter" aria-hidden="true"><i id="lvl"></i></div>
+    <div class="stats">
+      <div class="stat"><b id="sVer">–</b><span>QRバージョン</span></div>
+      <div class="stat"><b id="sBytes">–</b><span>1枚のバイト数</span></div>
+      <div class="stat"><b id="sRate">–</b><span>QR枚数／秒</span></div>
+      <div class="stat"><b id="sMod">–</b><span>モジュール数</span></div>
+    </div>
+    <p class="note">画面の明るさを最大にしてください。音質・詳細設定の変更は次の送信開始から反映されます（見た目は即時）。</p>
+  </section>
+
+  <section id="rxPanel" hidden>
+    <div class="row">
+      <label class="field">読み取り解像度（長辺）
+        <select id="res">
+          <option value="800">800 px（v2と同じ）</option>
+          <option value="1200" selected>1200 px</option>
+          <option value="1600">1600 px</option>
+        </select>
+      </label>
+    </div>
+    <button class="go" id="rxBtn">受信を開始</button>
+    <p class="err" id="rxErr"></p>
+    <div class="stage cam" id="rxStage">
+      <video id="video" playsinline muted></video>
+      <div class="idle" id="rxIdle" style="color:#9aa3ab">カメラの映像がここに表示されます</div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="rRead">–</b><span>読み取り／秒</span></div>
+      <div class="stat"><b id="rScan">–</b><span>試行／秒</span></div>
+      <div class="stat"><b id="rLoss">–</b><span>欠損率（直近15秒）</span></div>
+      <div class="stat"><b id="rDelay">–</b><span>遅延（秒）</span></div>
+      <div class="stat"><b id="rCodec">–</b><span>受信中の方式</span></div>
+      <div class="stat"><b id="rCam">–</b><span>カメラ／解析</span></div>
+    </div>
+    <p class="note">QRが画面の半分以上を占めるようにカメラを向けてください。バッファ時間は送信側の設定に従います。解像度は受信中でも変えられます（上げると1回の解析が重くなり、試行／秒が下がります）。iPhoneは消音モードを解除してください。</p>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const FRAME_US = 20000, FRAME_SEC = 0.02;
+const CODEC_OPUS = 1, CODEC_ADPCM = 2;
+const hasWC = typeof AudioEncoder !== 'undefined' && typeof AudioDecoder !== 'undefined';
+
+/* ---------- presets ---------- */
+const PRESETS = [
+  { name:'蝋管',    rate:3000, chunk:0.32, red:2, ec:'L', buf:1.5 },
+  { name:'電話',    rate:4000, chunk:0.24, red:2, ec:'L', buf:2.0 },
+  { name:'短波',    rate:6000, chunk:0.24, red:2, ec:'L', buf:3.0 },
+  { name:'AMラジオ', rate:8000, chunk:0.24, red:2, ec:'L', buf:4.0 },
+];
+function applyPreset(i){
+  const p = PRESETS[i];
+  $('#rate').value = p.rate; $('#chunk').value = p.chunk; $('#red').value = p.red; $('#ec').value = p.ec; $('#buf').value = p.buf.toFixed(1);
+  $('#dialName').textContent = p.name;
+  describe();
+}
+function readCfg(){
+  return { rate:+$('#rate').value, chunk:+$('#chunk').value, red:+$('#red').value, ec:$('#ec').value, buf:+$('#buf').value, fix:$('#fixver').checked };
+}
+function describe(){
+  const c = readCfg(), codec = $('#codec').value;
+  let perChunk;
+  if (codec === 'adpcm') perChunk = 3 + Math.round(c.rate * c.chunk / 2);
+  else perChunk = Math.round({ opus12:1500, opus16:2000 }[codec] * c.chunk) + Math.round(c.chunk / FRAME_SEC);
+  const bytes = 5 + c.red * (4 + perChunk);
+  $('#dialDesc').textContent = `${codec === 'adpcm' ? c.rate / 1000 + ' kHz ADPCM' : codec.replace('opus','Opus ') + 'kbps'}　約${bytes}バイト／枚　${(1 / c.chunk).toFixed(1)}枚／秒　冗長${c.red}倍　遅延${c.buf.toFixed(1)}秒`;
+}
+$('#dial').oninput = () => applyPreset(+$('#dial').value);
+for (const id of ['rate','chunk','red','ec','buf']) $('#' + id).onchange = () => { $('#dialName').textContent = 'カスタム'; describe(); };
+$('#codec').onchange = describe;
+applyPreset(1);
+
+/* ---------- tabs / look ---------- */
+function setTab(tx){
+  $('#tabTx').setAttribute('aria-pressed', tx); $('#tabRx').setAttribute('aria-pressed', !tx);
+  $('#txPanel').hidden = !tx; $('#rxPanel').hidden = tx;
+  if (tx && rx) stopRx(); if (!tx && tx_) stopTx();
+}
+$('#tabTx').onclick = () => setTab(true);
+$('#tabRx').onclick = () => setTab(false);
+$('#src').onchange = () => { $('#fileRow').hidden = $('#src').value !== 'file'; };
+if (!hasWC){
+  for (const o of $('#codec').options) if (o.value.startsWith('opus')) o.disabled = true;
+  $('#codec').value = 'adpcm';
+}
+let spinAngle = 0;
+function applyLook(){
+  const cv = $('#qr'), rpm = +$('#rpm').value, record = $('#look').value === 'record';
+  cv.classList.toggle('plain', !record);
+  if (!record || rpm === 0){ spinAngle = 0; cv.style.transform = ''; }
+  $('#txStage').classList.toggle('vinyl', record);
+}
+/* QRが切り替わる瞬間だけ盤を回す。表示中は静止（カメラの露光中に像が流れない） */
+function stepSpin(t){
+  const cv = $('#qr'), rpm = +$('#rpm').value, record = $('#look').value === 'record';
+  if (!record || rpm === 0) return;
+  spinAngle = (spinAngle + 360 * t.cfg.chunk * rpm / 60) % 360;
+  cv.style.transform = 'rotate(' + spinAngle.toFixed(2) + 'deg)';
+}
+for (const id of ['look','rpm','dots','tone']) $('#' + id).onchange = () => { applyLook(); if (tx_ && tx_.lastPkt) drawQR(tx_, tx_.lastPkt); };
+applyLook();
+
+/* ---------- IMA ADPCM ---------- */
+const IDX = [-1,-1,-1,-1,2,4,6,8];
+const STEP = [7,8,9,10,11,12,13,14,16,17,19,21,23,25,28,31,34,37,41,45,50,55,60,66,73,80,88,97,107,118,130,143,157,173,190,209,230,253,279,307,337,371,408,449,494,544,598,658,724,796,876,963,1060,1166,1282,1411,1552,1707,1878,2066,2272,2499,2749,3024,3327,3660,4026,4428,4871,5358,5894,6484,7132,7845,8630,9493,10442,11487,12635,13899,15289,16818,18500,20350,22385,24623,27086,29794,32767];
+function adpcmEncode(f32, st){
+  const out = new Uint8Array(3 + f32.length/2);
+  out[0] = (st.pred >> 8) & 0xff; out[1] = st.pred & 0xff; out[2] = st.idx;
+  let pred = st.pred, idx = st.idx;
+  for (let i = 0; i < f32.length; i++){
+    const s = Math.max(-32768, Math.min(32767, Math.round(f32[i] * 32767)));
+    let step = STEP[idx], diff = s - pred, code = 0;
+    if (diff < 0){ code = 8; diff = -diff; }
+    let vp = step >> 3;
+    if (diff >= step){ code |= 4; diff -= step; vp += step; } step >>= 1;
+    if (diff >= step){ code |= 2; diff -= step; vp += step; } step >>= 1;
+    if (diff >= step){ code |= 1; vp += step; }
+    pred += (code & 8) ? -vp : vp;
+    pred = Math.max(-32768, Math.min(32767, pred));
+    idx = Math.max(0, Math.min(88, idx + IDX[code & 7]));
+    if (i & 1) out[3 + (i >> 1)] |= code; else out[3 + (i >> 1)] = code << 4;
+  }
+  st.pred = pred; st.idx = idx;
+  return out;
+}
+function adpcmDecode(b){
+  let pred = (b[0] << 8) | b[1]; if (pred & 0x8000) pred -= 0x10000;
+  let idx = Math.min(88, b[2]);
+  const n = (b.length - 3) * 2, out = new Float32Array(n);
+  for (let i = 0; i < n; i++){
+    const byte = b[3 + (i >> 1)], code = (i & 1) ? byte & 15 : byte >> 4;
+    const step = STEP[idx];
+    let vp = step >> 3;
+    if (code & 4) vp += step; if (code & 2) vp += step >> 1; if (code & 1) vp += step >> 2;
+    pred += (code & 8) ? -vp : vp;
+    pred = Math.max(-32768, Math.min(32767, pred));
+    idx = Math.max(0, Math.min(88, idx + IDX[code & 7]));
+    out[i] = pred / 32768;
+  }
+  return out;
+}
+
+/* ---------- packet format v2 ----------
+   'R'(0x52) | codec | rate/250 (u8) | buffer×10 (u8) | n | { seq u16 | len u16 | body }*n
+   opus body : frames, each len (u8, or 0xFF + u16) + bytes
+   adpcm body: pred i16 | idx u8 | nibbles                              */
+function packFrames(frames){
+  let size = 0; for (const f of frames) size += (f.length < 255 ? 1 : 3) + f.length;
+  const out = new Uint8Array(size); let p = 0;
+  for (const f of frames){
+    if (f.length < 255) out[p++] = f.length;
+    else { out[p++] = 255; out[p++] = f.length >> 8; out[p++] = f.length & 0xff; }
+    out.set(f, p); p += f.length;
+  }
+  return out;
+}
+function unpackFrames(b){
+  const frames = []; let p = 0;
+  while (p < b.length){
+    let len = b[p++];
+    if (len === 255){ if (p + 2 > b.length) break; len = (b[p] << 8) | b[p+1]; p += 2; }
+    if (p + len > b.length) break;
+    frames.push(b.slice(p, p + len)); p += len;
+  }
+  return frames;
+}
+function buildPacket(codec, rate, buf, chunks){
+  let size = 5; for (const c of chunks) size += 4 + c.data.length;
+  const out = new Uint8Array(size);
+  out[0] = 0x52; out[1] = codec; out[2] = Math.round(rate / 250) & 0xff; out[3] = Math.round(buf * 10) & 0xff; out[4] = chunks.length; let p = 5;
+  for (const c of chunks){
+    out[p++] = c.seq >> 8; out[p++] = c.seq & 0xff;
+    out[p++] = c.data.length >> 8; out[p++] = c.data.length & 0xff;
+    out.set(c.data, p); p += c.data.length;
+  }
+  return out;
+}
+function parsePacket(b){
+  if (b.length < 5 || b[0] !== 0x52) return null;
+  const codec = b[1], rate = b[2] * 250, buf = b[3] / 10, n = b[4], chunks = []; let p = 5;
+  for (let i = 0; i < n; i++){
+    if (p + 4 > b.length) return null;
+    const seq = (b[p] << 8) | b[p+1], len = (b[p+2] << 8) | b[p+3]; p += 4;
+    if (p + len > b.length) return null;
+    chunks.push({ seq, data: b.subarray(p, p + len) }); p += len;
+  }
+  return { codec, rate, buf, chunks };
+}
+
+/* ---------- sender ---------- */
+let tx_ = null;
+$('#txBtn').onclick = () => tx_ ? stopTx() : startTx().catch(e => { $('#txErr').textContent = '開始できませんでした：' + (e.message || e); stopTx(); });
+
+async function startTx(){
+  $('#txErr').textContent = '';
+  const mode = $('#codec').value, cfg = readCfg();
+  const codec = mode === 'adpcm' ? CODEC_ADPCM : CODEC_OPUS;
+  const ctx = new AudioContext({ sampleRate: 48000 });
+  await ctx.resume();
+  const t = tx_ = { ctx, codec, cfg, seq: 0, hist: [], qrCount: 0, t0: performance.now(), level: 0, fixedVer: 0 };
+  $('#txBtn').textContent = '送信を停止'; $('#txBtn').classList.add('stop');
+
+  let srcNode;
+  if ($('#src').value === 'mic'){
+    t.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false, channelCount:1 } });
+    srcNode = ctx.createMediaStreamSource(t.stream);
+  } else {
+    const f = $('#file').files[0];
+    if (!f) throw new Error('音声ファイルを選んでください');
+    const buf = await ctx.decodeAudioData(await f.arrayBuffer());
+    srcNode = ctx.createBufferSource(); srcNode.buffer = buf; srcNode.loop = true; srcNode.start();
+    if ($('#monitor').checked) srcNode.connect(ctx.destination);
+  }
+  const proc = ctx.createScriptProcessor(2048, 1, 1);
+  const mute = ctx.createGain(); mute.gain.value = 0;
+  srcNode.connect(proc); proc.connect(mute); mute.connect(ctx.destination);
+  t.nodes = [srcNode, proc, mute];
+
+  const rateForHeader = codec === CODEC_ADPCM ? cfg.rate : 48000;
+  const emit = data => {
+    const cur = { seq: t.seq & 0xffff, data }; t.seq++;
+    t.hist.unshift(cur); if (t.hist.length > cfg.red) t.hist.length = cfg.red;
+    const pkt = buildPacket(codec, rateForHeader, cfg.buf, t.hist);
+    t.lastPkt = pkt;
+    drawQR(t, pkt); stepSpin(t); t.qrCount++;
+  };
+
+  if (codec === CODEC_OPUS){
+    const bitrate = { opus12: 12000, opus16: 16000 }[mode];
+    const chunkFrames = Math.round(cfg.chunk / FRAME_SEC);
+    let frames = [];
+    t.enc = new AudioEncoder({
+      output: c => { const b = new Uint8Array(c.byteLength); c.copyTo(b); frames.push(b);
+                     if (frames.length === chunkFrames){ emit(packFrames(frames)); frames = []; } },
+      error: e => { $('#txErr').textContent = 'エンコードエラー：' + e.message; }
+    });
+    let ecfg = { codec:'opus', sampleRate: ctx.sampleRate, numberOfChannels:1, bitrate, opus:{ frameDuration: FRAME_US, application:'audio' } };
+    const sup = await AudioEncoder.isConfigSupported(ecfg).catch(() => ({ supported:false }));
+    if (!sup.supported) ecfg = { codec:'opus', sampleRate: ctx.sampleRate, numberOfChannels:1, bitrate };
+    t.enc.configure(ecfg);
+    let ts = 0;
+    proc.onaudioprocess = e => {
+      const d = new Float32Array(e.inputBuffer.getChannelData(0));
+      meter(t, d);
+      if (t.enc.state !== 'configured') return;
+      const ad = new AudioData({ format:'f32-planar', sampleRate: ctx.sampleRate, numberOfFrames: d.length, numberOfChannels:1, timestamp: Math.round(ts * 1e6 / ctx.sampleRate), data: d });
+      ts += d.length; t.enc.encode(ad); ad.close();
+    };
+  } else {
+    const ratio = ctx.sampleRate / cfg.rate;
+    const N = Math.round(cfg.rate * cfg.chunk) & ~1;
+    const buf = new Float32Array(N), st = { pred:0, idx:0 };
+    let acc = 0, cnt = 0, ph = 0, n = 0;
+    proc.onaudioprocess = e => {
+      const d = e.inputBuffer.getChannelData(0);
+      meter(t, d);
+      for (let i = 0; i < d.length; i++){
+        acc += d[i]; cnt++; ph++;
+        if (ph >= ratio){
+          ph -= ratio; buf[n++] = acc / cnt; acc = 0; cnt = 0;
+          if (n === N){ emit(adpcmEncode(buf, st)); n = 0; }
+        }
+      }
+    };
+  }
+  try { t.wake = await navigator.wakeLock?.request('screen'); } catch {}
+  t.timer = setInterval(() => {
+    const sec = (performance.now() - t.t0) / 1000;
+    $('#sRate').textContent = (t.qrCount / sec).toFixed(1);
+    $('#lvl').style.width = Math.min(100, t.level * 300) + '%';
+  }, 200);
+}
+function meter(t, d){
+  let m = 0; for (let i = 0; i < d.length; i += 8) m = Math.max(m, Math.abs(d[i]));
+  t.level = Math.max(m, t.level * 0.85);
+}
+
+/* ---------- drawing ---------- */
+function makeQR(t, s){
+  const ec = t.cfg.ec;
+  if (t.cfg.fix && t.fixedVer){
+    try { const q = qrcode(t.fixedVer, ec); q.addData(s, 'Byte'); q.make(); return q; } catch {}
+  }
+  const q = qrcode(0, ec); q.addData(s, 'Byte'); q.make();
+  const v = (q.getModuleCount() - 17) / 4;
+  if (t.cfg.fix && v > t.fixedVer) t.fixedVer = v;
+  return q;
+}
+function isFinder(r, c, m){ return (r < 8 && c < 8) || (r < 8 && c >= m - 8) || (r >= m - 8 && c < 8); }
+function drawQR(t, bytes){
+  let s = ''; for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  let qr;
+  try { qr = makeQR(t, s); }
+  catch (e){ $('#txErr').textContent = 'QRに収まりませんでした。ダイヤルを下げるか冗長度を減らしてください。'; return; }
+  const m = qr.getModuleCount(), q = 4, cells = m + q * 2;
+  const record = $('#look').value === 'record', round = $('#dots').value === 'round', sepia = $('#tone').value === 'sepia';
+  const ink = sepia ? '#2b1a0c' : '#000', paper = sepia ? '#f1e6cd' : '#fff';
+  const cv = $('#qr'), g = cv.getContext('2d');
+
+  if (!record){
+    const scale = Math.max(2, Math.floor(900 / cells));
+    if (cv.width !== cells * scale){ cv.width = cv.height = cells * scale; }
+    g.fillStyle = paper; g.fillRect(0, 0, cv.width, cv.height);
+    g.fillStyle = ink;
+    drawModules(g, qr, m, q * scale, q * scale, scale, round);
+  } else {
+    const S = 1000;
+    if (cv.width !== S){ cv.width = cv.height = S; }
+    g.clearRect(0, 0, S, S);
+    const cx = S / 2, cy = S / 2;
+    g.fillStyle = '#0e0b09'; g.beginPath(); g.arc(cx, cy, S / 2 - 2, 0, Math.PI * 2); g.fill();
+    const side = Math.floor(S / 1.5), scale = Math.max(2, Math.floor(side / cells)), qrSide = cells * scale;
+    const labelR = Math.ceil(qrSide * 0.5 * Math.SQRT2) + 6;
+    g.strokeStyle = 'rgba(255,255,255,0.07)'; g.lineWidth = 1.2;
+    for (let r = labelR + 10; r < S / 2 - 12; r += 5){ g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke(); }
+    g.strokeStyle = 'rgba(255,255,255,0.16)'; g.lineWidth = 2;
+    for (const r of [labelR + 4, S / 2 - 8]){ g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke(); }
+    g.fillStyle = paper; g.beginPath(); g.arc(cx, cy, labelR, 0, Math.PI * 2); g.fill();
+    g.fillStyle = ink;
+    drawModules(g, qr, m, cx - qrSide / 2 + q * scale, cy - qrSide / 2 + q * scale, scale, round);
+  }
+  cv.hidden = false; $('#txIdle').hidden = true;
+  $('#sVer').textContent = (m - 17) / 4;
+  $('#sBytes').textContent = bytes.length;
+  $('#sMod').textContent = m + '×' + m;
+}
+function drawModules(g, qr, m, ox, oy, scale, round){
+  const rad = scale * 0.6;
+  for (let r = 0; r < m; r++) for (let c = 0; c < m; c++){
+    if (!qr.isDark(r, c)) continue;
+    const x = ox + c * scale, y = oy + r * scale;
+    if (round && !isFinder(r, c, m)){ g.beginPath(); g.arc(x + scale / 2, y + scale / 2, rad, 0, Math.PI * 2); g.fill(); }
+    else g.fillRect(x, y, scale, scale);
+  }
+}
+function stopTx(){
+  const t = tx_; tx_ = null;
+  $('#txBtn').textContent = '送信を開始'; $('#txBtn').classList.remove('stop');
+  $('#qr').hidden = true; $('#qr').style.transform = ''; spinAngle = 0; $('#txIdle').hidden = false; $('#lvl').style.width = '0';
+  if (!t) return;
+  clearInterval(t.timer);
+  try { t.nodes?.forEach(n => n.disconnect()); } catch {}
+  try { t.enc?.close(); } catch {}
+  t.stream?.getTracks().forEach(tr => tr.stop());
+  t.wake?.release?.().catch(() => {});
+  t.ctx.close().catch(() => {});
+}
+
+/* ---------- receiver ---------- */
+let rx = null;
+$('#rxBtn').onclick = () => rx ? stopRx() : startRx().catch(e => { $('#rxErr').textContent = '開始できませんでした：' + (e.message || e); stopRx(); });
+
+async function startRx(){
+  $('#rxErr').textContent = '';
+  const actx = new AudioContext(); await actx.resume();
+  const r = rx = { actx, reads: 0, t0: performance.now(), recent: [], scans: [], started: false, lastRecv: -1e9 };
+  $('#rxBtn').textContent = '受信を停止'; $('#rxBtn').classList.add('stop');
+  r.out = actx.createGain(); r.out.connect(actx.destination);
+  r.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:{ ideal:'environment' }, width:{ ideal:1920 }, height:{ ideal:1080 } }, audio:false });
+  const v = $('#video'); v.srcObject = r.stream; await v.play();
+  $('#rxIdle').hidden = true;
+  r.canvas = document.createElement('canvas');
+  r.g = r.canvas.getContext('2d', { willReadFrequently:true });
+  if (hasWC){
+    r.dec = new AudioDecoder({ output: ad => onDecoded(r, ad), error: e => { $('#rxErr').textContent = 'デコードエラー：' + e.message; } });
+    r.dec.configure({ codec:'opus', sampleRate:48000, numberOfChannels:1 });
+  }
+  const loop = () => { if (rx !== r) return; scan(r); r.raf = requestAnimationFrame(loop); };
+  loop();
+  r.tick = setInterval(() => schedule(r), 40);
+  r.ui = setInterval(() => rxStats(r), 300);
+  try { r.wake = await navigator.wakeLock?.request('screen'); } catch {}
+}
+function resetStream(r){
+  r.started = false; r.pcm = new Map(); r.have = new Set(); r.hist = []; r.lastWasGap = false;
+}
+function scan(r){
+  const v = $('#video');
+  if (v.readyState < 2 || !v.videoWidth) return;
+  const k = Math.min(1, (+$('#res').value || 800) / Math.max(v.videoWidth, v.videoHeight));
+  const w = Math.round(v.videoWidth * k), h = Math.round(v.videoHeight * k);
+  if (r.canvas.width !== w){ r.canvas.width = w; r.canvas.height = h; }
+  r.g.drawImage(v, 0, 0, w, h);
+  const img = r.g.getImageData(0, 0, w, h);
+  r.scans.push(performance.now());
+  r.camInfo = v.videoWidth + '×' + v.videoHeight + ' / ' + w + '×' + h;
+  const res = jsQR(img.data, w, h, { inversionAttempts:'dontInvert' });
+  if (res && res.binaryData && res.binaryData.length) onPacket(r, Uint8Array.from(res.binaryData));
+}
+function chunkSecOf(p, c){
+  if (p.codec === CODEC_ADPCM) return ((c.data.length - 3) * 2) / p.rate;
+  return unpackFrames(c.data).length * FRAME_SEC;
+}
+function onPacket(r, bytes){
+  const p = parsePacket(bytes); if (!p || !p.chunks.length) return;
+  r.reads++; r.recent.push(performance.now());
+  const st = $('#rxStage'); st.classList.add('hit'); clearTimeout(r.flash);
+  r.flash = setTimeout(() => st.classList.remove('hit'), 120);
+  if (p.codec === CODEC_OPUS && !r.dec){ $('#rxErr').textContent = 'このブラウザはOpusを再生できません。送信側をADPCMにしてください。'; return; }
+  r.lastRecv = r.actx.currentTime;
+  for (const c of p.chunks){
+    if (!r.started || r.codec !== p.codec || r.rate !== p.rate){
+      resetStream(r);
+      r.started = true; r.codec = p.codec; r.rate = p.rate; r.bufSec = p.buf || 2;
+      r.chunkSec = chunkSecOf(p, c) || 0.24; r.chunkUs = Math.round(r.chunkSec * 1e6);
+      r.lastAbs = c.seq;
+      r.nextAbs = c.seq - 1; r.nextTime = r.actx.currentTime + r.bufSec;
+      $('#rCodec').textContent = p.codec === CODEC_OPUS ? 'Opus' : 'ADPCM ' + (p.rate / 1000) + 'kHz';
+    }
+    const diff = ((c.seq - (r.lastAbs & 0xffff) + 0x8000) & 0xffff) - 0x8000;
+    if (Math.abs(diff) > 200){ r.started = false; return onPacket(r, bytes); }
+    const abs = r.lastAbs + diff;
+    if (diff > 0) r.lastAbs = abs;
+    if (abs < r.nextAbs || r.have.has(abs)) continue;
+    r.have.add(abs);
+    if (p.codec === CODEC_ADPCM){
+      r.pcm.set(abs, { rate: p.rate, data: adpcmDecode(c.data) });
+    } else {
+      const frames = unpackFrames(c.data);
+      frames.forEach((f, i) => {
+        try { r.dec.decode(new EncodedAudioChunk({ type:'key', timestamp: abs * r.chunkUs + i * FRAME_US, data: f })); } catch {}
+      });
+    }
+  }
+}
+function onDecoded(r, ad){
+  try {
+    const abs = Math.floor((ad.timestamp + 1) / r.chunkUs);
+    const i = Math.round((ad.timestamp - abs * r.chunkUs) / FRAME_US);
+    const rate = ad.sampleRate, fs = Math.round(rate * FRAME_SEC);
+    let e = r.pcm.get(abs);
+    if (!e){ e = { rate, data: new Float32Array(Math.round(rate * r.chunkSec)) }; r.pcm.set(abs, e); }
+    const tmp = new Float32Array(ad.numberOfFrames);
+    ad.copyTo(tmp, { planeIndex:0, format:'f32-planar' });
+    const off = i * fs;
+    if (off < e.data.length) e.data.set(tmp.subarray(0, Math.min(tmp.length, e.data.length - off)), off);
+  } catch {}
+  ad.close();
+}
+function makeBuf(actx, data, rate){
+  try { const b = actx.createBuffer(1, data.length, rate); b.copyToChannel(data, 0); return b; }
+  catch {
+    const up = 4, o = new Float32Array(data.length * up);
+    for (let i = 0; i < o.length; i++){
+      const x = i / up, j = Math.floor(x), f = x - j;
+      o[i] = data[j] * (1 - f) + (data[j + 1] ?? data[j]) * f;
+    }
+    const b = actx.createBuffer(1, o.length, rate * up); b.copyToChannel(o, 0); return b;
+  }
+}
+function filler(r){
+  const rate = r.codec === CODEC_ADPCM ? r.rate : 48000;
+  const d = new Float32Array(Math.round(rate * r.chunkSec));
+  if (r.codec === CODEC_ADPCM){ let y = 0; for (let i = 0; i < d.length; i++){ y = y * 0.6 + (Math.random() * 2 - 1) * 0.4; d[i] = y * 0.03; } }
+  return makeBuf(r.actx, d, rate);
+}
+function fadeIn(data, rate){
+  const n = Math.min(data.length, Math.round(rate * 0.005));
+  for (let i = 0; i < n; i++) data[i] *= i / n;
+}
+function schedule(r){
+  if (!r.started) return;
+  const now = r.actx.currentTime;
+  if (now - r.lastRecv > 4 && r.nextTime < now + 0.1){ resetStream(r); $('#rDelay').textContent = '–'; return; }
+  while (r.nextTime < now + 0.5){
+    if (r.nextTime < now) r.nextTime = now + 0.05;
+    r.nextAbs++;
+    const e = r.pcm.get(r.nextAbs);
+    if (e && r.lastWasGap) fadeIn(e.data, e.rate);
+    const buf = e ? makeBuf(r.actx, e.data, e.rate) : filler(r);
+    r.lastWasGap = !e;
+    /* 欠損率は「信号が届いている間」だけ数える。QRが全く読めていない区間（1.5秒以上受信なし）は
+       欠損ではなく「信号なし」として除外し、直近15秒の時間窓で集計する */
+    if (now - r.lastRecv < 1.5) r.hist.push({ t: performance.now(), ok: !!e });
+    const s = r.actx.createBufferSource(); s.buffer = buf; s.connect(r.out); s.start(r.nextTime);
+    r.pcm.delete(r.nextAbs); r.have.delete(r.nextAbs);
+    r.nextTime += r.chunkSec;
+  }
+}
+function rxStats(r){
+  const now = performance.now();
+  r.recent = r.recent.filter(t => now - t < 2000);
+  r.scans = r.scans.filter(t => now - t < 2000);
+  $('#rRead').textContent = (r.recent.length / 2).toFixed(1);
+  $('#rScan').textContent = (r.scans.length / 2).toFixed(1);
+  if (r.camInfo) $('#rCam').textContent = r.camInfo;
+  if (r.hist) r.hist = r.hist.filter(h => now - h.t < 15000);
+  const signal = r.actx.currentTime - r.lastRecv < 1.5;
+  if (r.started && signal && r.hist && r.hist.length){
+    const lost = r.hist.filter(h => !h.ok).length;
+    $('#rLoss').textContent = Math.round(lost / r.hist.length * 100) + '%';
+    $('#rDelay').textContent = Math.max(0, (r.lastAbs - r.nextAbs) * r.chunkSec + (r.nextTime - r.actx.currentTime)).toFixed(1);
+  } else if (r.started && !signal){
+    $('#rLoss').textContent = '信号なし';
+  }
+}
+function stopRx(){
+  const r = rx; rx = null;
+  $('#rxBtn').textContent = '受信を開始'; $('#rxBtn').classList.remove('stop');
+  $('#rxIdle').hidden = false;
+  if (!r) return;
+  cancelAnimationFrame(r.raf); clearInterval(r.tick); clearInterval(r.ui);
+  r.stream?.getTracks().forEach(t => t.stop());
+  $('#video').srcObject = null;
+  try { r.dec?.close(); } catch {}
+  r.wake?.release?.().catch(() => {});
+  r.actx.close().catch(() => {});
+}
+</script>
+</body>
+</html>
