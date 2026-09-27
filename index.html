@@ -64,6 +64,7 @@ details .row{margin-top:10px}
 /* v3: 回転はCSSアニメーションではなく、QR切り替えごとの離散回転（コマ送り）。表示中は静止させて動きブレを避ける */
 .stage.cam{background:#000; padding:0; overflow:hidden}
 video{width:100%; display:block; max-height:60vh; object-fit:contain}
+#guide{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); border:2px dashed rgba(255,255,255,.7); pointer-events:none; box-sizing:border-box}
 .idle{color:#6b737b; font-size:14px; text-align:center; padding:24px}
 .meter{height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin:12px 0 8px}
 .meter i{display:block; height:100%; width:0; background:var(--accent)}
@@ -143,6 +144,12 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
           <option value="mono">黒白</option>
         </select>
       </label>
+      <label class="field">盤面の埋め
+        <select id="fill">
+          <option value="dots" selected>薄いドットで円に</option>
+          <option value="none">なし（四角のまま）</option>
+        </select>
+      </label>
     </div>
 
     <details>
@@ -207,6 +214,9 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
 
   <section id="rxPanel" hidden>
     <div class="row">
+      <label class="field">カメラ
+        <select id="cam"><option value="">背面（自動）</option></select>
+      </label>
       <label class="field">読み取り解像度（長辺）
         <select id="res">
           <option value="800">800 px（v2と同じ）</option>
@@ -214,11 +224,24 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
           <option value="1600">1600 px</option>
         </select>
       </label>
+      <label class="field">中央切り出し（デジタルズーム）
+        <select id="crop">
+          <option value="1" selected>なし</option>
+          <option value="1.5">1.5倍</option>
+          <option value="2">2倍</option>
+          <option value="3">3倍</option>
+        </select>
+      </label>
+    </div>
+    <div class="dial" id="zoomBox" hidden>
+      <div class="hd"><span>カメラのズーム</span><b id="zoomVal">1.0×</b></div>
+      <input type="range" id="zoom" min="1" max="1" step="0.1" value="1" aria-label="ズーム">
     </div>
     <button class="go" id="rxBtn">受信を開始</button>
     <p class="err" id="rxErr"></p>
     <div class="stage cam" id="rxStage">
       <video id="video" playsinline muted></video>
+      <div id="guide" hidden></div>
       <div class="idle" id="rxIdle" style="color:#9aa3ab">カメラの映像がここに表示されます</div>
     </div>
     <div class="stats">
@@ -229,7 +252,7 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
       <div class="stat"><b id="rCodec">–</b><span>受信中の方式</span></div>
       <div class="stat"><b id="rCam">–</b><span>カメラ／解析</span></div>
     </div>
-    <p class="note">QRが画面の半分以上を占めるようにカメラを向けてください。バッファ時間は送信側の設定に従います。解像度は受信中でも変えられます（上げると1回の解析が重くなり、試行／秒が下がります）。iPhoneは消音モードを解除してください。</p>
+    <p class="note">QRが画面の半分以上を占めるようにカメラを向けてください。バッファ時間は送信側の設定に従います。解像度・切り出し・ズームは受信中でも変えられます（解像度を上げると試行／秒が下がります）。「中央切り出し」はカメラの元画像の中央だけを解析するので、離れた位置からでも1モジュールあたりの画素数を稼げます。カメラのズームはブラウザが対応している場合だけ表示されます。iPhoneは消音モードを解除してください。</p>
   </section>
 </main>
 
@@ -295,7 +318,7 @@ function stepSpin(t){
   spinAngle = (spinAngle + 360 * t.cfg.chunk * rpm / 60) % 360;
   cv.style.transform = 'rotate(' + spinAngle.toFixed(2) + 'deg)';
 }
-for (const id of ['look','rpm','dots','tone']) $('#' + id).onchange = () => { applyLook(); if (tx_ && tx_.lastPkt) drawQR(tx_, tx_.lastPkt); };
+for (const id of ['look','rpm','dots','tone','fill']) $('#' + id).onchange = () => { applyLook(); if (tx_ && tx_.lastPkt) drawQR(tx_, tx_.lastPkt); };
 applyLook();
 
 /* ---------- IMA ADPCM ---------- */
@@ -514,13 +537,31 @@ function drawQR(t, bytes){
     g.strokeStyle = 'rgba(255,255,255,0.16)'; g.lineWidth = 2;
     for (const r of [labelR + 4, S / 2 - 8]){ g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke(); }
     g.fillStyle = paper; g.beginPath(); g.arc(cx, cy, labelR, 0, Math.PI * 2); g.fill();
+    const ox = cx - qrSide / 2, oy = cy - qrSide / 2;
+    if ($('#fill').value === 'dots') drawFiller(g, ink, ox, oy, cells, scale, cx, cy, labelR, round);
     g.fillStyle = ink;
-    drawModules(g, qr, m, cx - qrSide / 2 + q * scale, cy - qrSide / 2 + q * scale, scale, round);
+    drawModules(g, qr, m, ox + q * scale, oy + q * scale, scale, round);
   }
   cv.hidden = false; $('#txIdle').hidden = true;
   $('#sVer').textContent = (m - 17) / 4;
   $('#sBytes').textContent = bytes.length;
   $('#sMod').textContent = m + '×' + m;
+}
+/* ラベル円のうちQR（クワイエットゾーン込み）の外側を、薄いドットで埋めて四角い輪郭を消す。
+   濃さ30%は jsQR の二値化で「白」側に落ちることを確認済み（v22〜v32、ぼかし付きで検証）。
+   配置は固定シード乱数なので毎枚同じ模様になり、回転時に模様が一緒に回る */
+function drawFiller(g, ink, ox, oy, cells, scale, cx, cy, labelR, round){
+  let seed = 7; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  const ext = Math.ceil(labelR / scale) + 2, lim = (labelR - scale) * (labelR - scale);
+  g.save(); g.fillStyle = ink; g.globalAlpha = 0.3;
+  for (let r = -ext; r <= cells + ext; r++) for (let c = -ext; c <= cells + ext; c++){
+    if (r >= -1 && r < cells + 1 && c >= -1 && c < cells + 1) continue; /* QR＋クワイエットゾーン＋1モジュールは空ける */
+    const x = ox + c * scale, y = oy + r * scale, dx = x + scale / 2 - cx, dy = y + scale / 2 - cy;
+    if (dx * dx + dy * dy > lim || rnd() >= 0.5) continue;
+    if (round){ g.beginPath(); g.arc(x + scale / 2, y + scale / 2, scale * 0.6, 0, Math.PI * 2); g.fill(); }
+    else g.fillRect(x, y, scale, scale);
+  }
+  g.restore();
 }
 function drawModules(g, qr, m, ox, oy, scale, round){
   const rad = scale * 0.6;
@@ -554,9 +595,13 @@ async function startRx(){
   const r = rx = { actx, reads: 0, t0: performance.now(), recent: [], scans: [], started: false, lastRecv: -1e9 };
   $('#rxBtn').textContent = '受信を停止'; $('#rxBtn').classList.add('stop');
   r.out = actx.createGain(); r.out.connect(actx.destination);
-  r.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:{ ideal:'environment' }, width:{ ideal:1920 }, height:{ ideal:1080 } }, audio:false });
+  const camId = $('#cam').value;
+  const vc = camId ? { deviceId:{ exact: camId } } : { facingMode:{ ideal:'environment' } };
+  r.stream = await navigator.mediaDevices.getUserMedia({ video: { ...vc, width:{ ideal:1920 }, height:{ ideal:1080 } }, audio:false });
   const v = $('#video'); v.srcObject = r.stream; await v.play();
   $('#rxIdle').hidden = true;
+  listCameras();
+  setupZoom(r);
   r.canvas = document.createElement('canvas');
   r.g = r.canvas.getContext('2d', { willReadFrequently:true });
   if (hasWC){
@@ -572,16 +617,52 @@ async function startRx(){
 function resetStream(r){
   r.started = false; r.pcm = new Map(); r.have = new Set(); r.hist = []; r.lastWasGap = false;
 }
+/* カメラ一覧（権限取得後にラベルが得られる）。iPhoneでは望遠が別デバイスとして並ぶことがある */
+async function listCameras(){
+  try {
+    const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+    const sel = $('#cam'), cur = sel.value;
+    sel.innerHTML = '<option value="">背面（自動）</option>';
+    for (const d of devs){ const o = document.createElement('option'); o.value = d.deviceId; o.textContent = d.label || 'カメラ ' + (sel.length); sel.appendChild(o); }
+    sel.value = cur;
+  } catch {}
+}
+$('#cam').onchange = () => { if (rx){ stopRx(); startRx().catch(e => { $('#rxErr').textContent = '開始できませんでした：' + (e.message || e); stopRx(); }); } };
+/* ブラウザがズーム制約に対応していればスライダーを出す（iOS 17以降のSafari、Android Chrome）。
+   多くの機種でこれは光学ではなくセンサー切り出しだが、1080p出力の中で切り出すので「中央切り出し」より画素が残る */
+function setupZoom(r){
+  const box = $('#zoomBox'), sl = $('#zoom'); box.hidden = true;
+  try {
+    const track = r.stream.getVideoTracks()[0], cap = track.getCapabilities ? track.getCapabilities() : {};
+    if (!cap.zoom || !(cap.zoom.max > cap.zoom.min)) return;
+    sl.min = cap.zoom.min; sl.max = cap.zoom.max; sl.step = cap.zoom.step || 0.1;
+    const cur = track.getSettings().zoom || cap.zoom.min; sl.value = cur; $('#zoomVal').textContent = (+cur).toFixed(1) + '×';
+    sl.oninput = () => { $('#zoomVal').textContent = (+sl.value).toFixed(1) + '×'; track.applyConstraints({ advanced:[{ zoom:+sl.value }] }).catch(() => {}); };
+    box.hidden = false;
+  } catch {}
+}
+function updateGuide(){
+  const v = $('#video'), g = $('#guide'), crop = +$('#crop').value || 1;
+  if (!rx || crop === 1 || !v.videoWidth){ g.hidden = true; return; }
+  const box = v.getBoundingClientRect(), ar = v.videoWidth / v.videoHeight;
+  let vw = box.width, vh = vw / ar; if (vh > box.height){ vh = box.height; vw = vh * ar; }
+  g.style.width = (vw / crop) + 'px'; g.style.height = (vh / crop) + 'px'; g.hidden = false;
+}
+$('#crop').onchange = updateGuide; window.addEventListener('resize', updateGuide);
 function scan(r){
   const v = $('#video');
   if (v.readyState < 2 || !v.videoWidth) return;
-  const k = Math.min(1, (+$('#res').value || 800) / Math.max(v.videoWidth, v.videoHeight));
-  const w = Math.round(v.videoWidth * k), h = Math.round(v.videoHeight * k);
-  if (r.canvas.width !== w){ r.canvas.width = w; r.canvas.height = h; }
-  r.g.drawImage(v, 0, 0, w, h);
+  if (!r.guided){ r.guided = true; updateGuide(); }
+  const crop = +$('#crop').value || 1;
+  const sw = Math.round(v.videoWidth / crop), sh = Math.round(v.videoHeight / crop);
+  const sx = (v.videoWidth - sw) >> 1, sy = (v.videoHeight - sh) >> 1;
+  const k = Math.min(1, (+$('#res').value || 800) / Math.max(sw, sh));
+  const w = Math.round(sw * k), h = Math.round(sh * k);
+  if (r.canvas.width !== w || r.canvas.height !== h){ r.canvas.width = w; r.canvas.height = h; }
+  r.g.drawImage(v, sx, sy, sw, sh, 0, 0, w, h);
   const img = r.g.getImageData(0, 0, w, h);
   r.scans.push(performance.now());
-  r.camInfo = v.videoWidth + '×' + v.videoHeight + ' / ' + w + '×' + h;
+  r.camInfo = v.videoWidth + '×' + v.videoHeight + (crop > 1 ? ' 中央1/' + crop : '') + ' → ' + w + '×' + h;
   const res = jsQR(img.data, w, h, { inversionAttempts:'dontInvert' });
   if (res && res.binaryData && res.binaryData.length) onPacket(r, Uint8Array.from(res.binaryData));
 }
@@ -695,7 +776,7 @@ function rxStats(r){
 function stopRx(){
   const r = rx; rx = null;
   $('#rxBtn').textContent = '受信を開始'; $('#rxBtn').classList.remove('stop');
-  $('#rxIdle').hidden = false;
+  $('#rxIdle').hidden = false; $('#guide').hidden = true; $('#zoomBox').hidden = true;
   if (!r) return;
   cancelAnimationFrame(r.raf); clearInterval(r.tick); clearInterval(r.ui);
   r.stream?.getTracks().forEach(t => t.stop());
