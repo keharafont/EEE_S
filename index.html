@@ -126,11 +126,11 @@ details .row{margin-top:4px}
 /* v3.11 コード層は送信開始で浮かび上がり、停止で消える。下の #disc（白い円／4:3 の地）は常に出ている */
 #qr{opacity:0; transition:opacity 1.6s ease}
 #qr.on{opacity:1}
-.stage.cam{background:#000; padding:0; overflow:hidden}
-video{width:100%; display:block; max-height:60vh; object-fit:contain}
+.stage.cam{background:#000; padding:0; overflow:hidden; height:60vh}   /* 受信前後で同じ大きさ（映像は中に収める） */
+video{width:100%; height:100%; display:block; object-fit:contain}
 #guide{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); border:2px dashed rgba(255,255,255,.7); pointer-events:none; box-sizing:border-box}
 .idle{color:var(--muted); font-size:14px; text-align:center; padding:24px}
-.stage.cam .idle{color:#9aa3ab}
+.stage.cam .idle{color:#9aa3ab; position:absolute; inset:0; display:flex; align-items:center; justify-content:center}
 .meter{height:4px; background:var(--paper-2); border:1px solid var(--ink); margin:12px 0 6px}
 .meter i{display:block; height:100%; width:0; background:var(--ink)}
 
@@ -147,7 +147,8 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
 .stage.full{position:fixed; inset:0; z-index:50; border-radius:0; border:0; padding:0; margin:0; background:#000; display:flex; align-items:center; justify-content:center}
 .stage.full #wrap{max-width:min(100vw,100vh); width:min(100vw,100vh)}
 .stage.full #wrap.wide{max-width:min(100vw,133.33vh); width:min(100vw,133.33vh)}
-.stage.full video{max-height:100vh; height:100vh; width:100vw; object-fit:contain}
+.stage.full.cam{height:100vh}
+.stage.full video{height:100vh; width:100vw; object-fit:contain}
 .fsbtn{position:absolute; right:10px; top:10px; z-index:2; appearance:none; border:1px solid rgba(255,255,255,.5); background:rgba(0,0,0,.5); color:#fff; font:inherit; font-size:13px; padding:5px 10px; border-radius:4px; cursor:pointer}
 .stage:not(.vinyl):not(.cam) .fsbtn{color:var(--ink); background:rgba(211,213,208,.8); border-color:var(--ink)}
 /* 受信側 HUD：カメラ映像に重ねる */
