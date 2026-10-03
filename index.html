@@ -4,167 +4,202 @@
 <meta charset="utf-8">
 <meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>映すラジオ：QRで音を送る v3.8</title>
+<title>映すラジオ：QRで音を送る v3.9</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Noto+Serif:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <!-- v3.3: reader → full（Aztec の生成に writer が要る。.wasm 約1.4MB は jsDelivr から自動取得） -->
 <script src="https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.4/dist/iife/full/index.js"></script>
 <style>
+/* v3.9 電子ペーパー風の単色デザイン（本人提示の参考画像：グレーの地・濃いインク・セリフ体・細い罫線・ディザの帯） */
 :root{
-  --bg:#e6e8ea; --ink:#1c2127; --muted:#5d6670; --line:#c3c9cf; --panel:#f1f2f3;
-  --accent:#0f6b5c; --accent-ink:#ffffff; --warn:#a4461b;
+  --paper:#d3d5d0; --ink:#1b2027; --muted:#4a515a; --paper-2:#c6c8c3;
+  --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M2 1l5 4-5 4z' fill='%231b2027'/%3E%3C/svg%3E");
   box-sizing:border-box;
-  padding-top:env(safe-area-inset-top,0px);
-  padding-bottom:env(safe-area-inset-bottom,0px);
-}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --bg:#161b20; --ink:#e3e6e8; --muted:#8b949c; --line:#2e373f; --panel:#1d2329;
-    --accent:#4fc3a9; --accent-ink:#0c1a17; --warn:#f08a5d;
-  }
-}
-:root[data-theme="dark"]{
-  --bg:#161b20; --ink:#e3e6e8; --muted:#8b949c; --line:#2e373f; --panel:#1d2329;
-  --accent:#4fc3a9; --accent-ink:#0c1a17; --warn:#f08a5d;
 }
 *,*::before,*::after{box-sizing:inherit}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{
-  margin:0; background:var(--bg); color:var(--ink);
-  font-family:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
-  font-size:16px; line-height:1.6; -webkit-text-size-adjust:100%;
+  margin:0; background:#0b0d10; color:var(--ink);
+  font-family:"Noto Serif JP","Noto Serif","Hiragino Mincho ProN","Yu Mincho",serif;
+  font-size:16px; line-height:1.5; -webkit-text-size-adjust:100%;
+  padding:max(10px,env(safe-area-inset-top,0px)) 10px max(10px,env(safe-area-inset-bottom,0px));
 }
-main{max-width:640px; margin:0 auto; padding:20px 16px 40px}
-h1{font-size:28px; line-height:1.2; margin:4px 0 4px; letter-spacing:.02em}
-.lede{margin:0 0 20px; color:var(--muted); font-size:15px}
-.seg{display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--line); border-radius:10px; overflow:hidden; margin-bottom:20px}
-.seg button{appearance:none; border:0; background:transparent; color:var(--ink); font:inherit; font-weight:700; padding:12px; cursor:pointer}
-.seg button[aria-pressed="true"]{background:var(--ink); color:var(--bg)}
-.row{display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px}
-label.field{display:flex; flex-direction:column; gap:4px; font-size:13px; color:var(--muted); flex:1 1 150px}
-select,input[type=file]{font:inherit; font-size:15px; color:var(--ink); background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:9px 10px; width:100%}
-.check{display:flex; align-items:center; gap:8px; font-size:14px; color:var(--muted)}
-.go{appearance:none; border:0; border-radius:10px; background:var(--accent); color:var(--accent-ink); font:inherit; font-weight:700; font-size:17px; padding:14px; width:100%; cursor:pointer; margin:4px 0 16px}
-.go.stop{background:var(--ink); color:var(--bg)}
-button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--accent); outline-offset:2px}
-.dial{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:12px}
-.dial .hd{display:flex; justify-content:space-between; align-items:baseline; font-size:13px; color:var(--muted)}
-.dial .hd b{font-size:18px; color:var(--ink)}
-.dial input[type=range]{width:100%; margin:8px 0 2px; accent-color:var(--accent)}
+main{
+  max-width:640px; margin:0 auto; padding:14px 16px 30px;
+  background:var(--paper); color:var(--ink); border:2px solid var(--ink); border-radius:18px;
+  /* 電子ペーパーの粒子 */
+  background-image:radial-gradient(rgba(27,32,39,.055) .6px, transparent .9px); background-size:3px 3px;
+}
+/* ディザの帯（反転表示） */
+.band{background-color:var(--ink); color:var(--paper); background-image:radial-gradient(rgba(211,213,208,.30) .55px, transparent .95px); background-size:3px 3px}
+
+/* タイトル行：左に名前、右に版 */
+.bar{display:grid; grid-template-columns:1fr auto; gap:8px; margin-bottom:12px}
+.bar > *{border:1px solid var(--ink); padding:4px 10px; font-weight:700; font-size:18px; line-height:1.3}
+.bar .ver{font-weight:400; font-size:14px; display:flex; align-items:center; gap:8px}
+.lede{margin:0 0 14px; color:var(--muted); font-size:13px}
+
+.seg{display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--ink); border-radius:4px; overflow:hidden; margin-bottom:16px}
+.seg button{appearance:none; border:0; background:transparent; color:var(--ink); font:inherit; font-weight:700; font-size:17px; padding:9px; cursor:pointer}
+.seg button + button{border-left:1px solid var(--ink)}
+.seg.quad{grid-template-columns:repeat(4,1fr); margin:8px 0 6px}
+.seg.quad button{font-size:15px; padding:8px 4px}
+.seg button[aria-pressed="true"]{background-color:var(--ink); color:var(--paper); background-image:radial-gradient(rgba(211,213,208,.30) .55px, transparent .95px); background-size:3px 3px}
+
+/* 設定行：左にラベル、右に値。下に 1px の罫線 */
+.row{display:grid; grid-template-columns:1fr 1fr; column-gap:22px; row-gap:0; margin-bottom:10px}
+@media (max-width:480px){ .row{grid-template-columns:1fr} }
+label.field{display:flex; justify-content:space-between; align-items:center; gap:10px; min-height:40px; padding:4px 0; border-bottom:1px solid var(--ink); font-size:16px; color:var(--ink)}
+label.field > select, label.field > input[type=file]{flex:0 1 auto; min-width:0; max-width:62%}
+select{
+  appearance:none; -webkit-appearance:none; font:inherit; font-weight:700; font-size:16px; color:var(--ink);
+  background:transparent var(--chev) no-repeat right center; background-size:9px 9px; border:0; border-radius:0; padding:4px 14px 4px 0; text-align:right; direction:rtl;
+}
+select option{direction:ltr; text-align:left; font-weight:400; background:var(--paper); color:var(--ink)}
+input[type=file]{font:inherit; font-size:13px; color:var(--ink); background:transparent; border:0; padding:4px 0; width:100%}
+.check{display:flex; align-items:center; gap:10px; min-height:40px; padding:4px 0; border-bottom:1px solid var(--ink); font-size:15px; color:var(--ink)}
+.check input{appearance:none; -webkit-appearance:none; width:16px; height:16px; margin:0; border:1px solid var(--ink); background:transparent; flex:none; position:relative}
+.check input:checked{background:var(--ink)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--ink); outline-offset:2px}
+
+/* ダイヤル */
+.dial{border-bottom:1px solid var(--ink); padding:8px 0 10px; margin-bottom:10px}
+.dial .hd{display:flex; justify-content:space-between; align-items:baseline; font-size:16px}
+.dial .hd b{font-size:22px; font-weight:700}
+.dial input[type=range]{appearance:none; -webkit-appearance:none; width:100%; height:24px; margin:4px 0 0; background:transparent}
+.dial input[type=range]::-webkit-slider-runnable-track{height:2px; background:var(--ink)}
+.dial input[type=range]::-webkit-slider-thumb{appearance:none; -webkit-appearance:none; width:14px; height:18px; margin-top:-8px; background:var(--ink); border:0; border-radius:2px}
+.dial input[type=range]::-moz-range-track{height:2px; background:var(--ink)}
+.dial input[type=range]::-moz-range-thumb{width:14px; height:18px; background:var(--ink); border:0; border-radius:2px}
 .dial .ends{display:flex; justify-content:space-between; font-size:12px; color:var(--muted)}
 .dial .desc{font-size:13px; color:var(--muted); margin-top:4px; font-variant-numeric:tabular-nums}
-details{border:1px solid var(--line); border-radius:10px; padding:8px 14px; margin-bottom:12px}
-summary{cursor:pointer; font-size:14px; color:var(--muted); padding:4px 0}
-details .row{margin-top:10px}
-.stage{position:relative; background:#fff; border-radius:12px; padding:12px; display:flex; justify-content:center; align-items:center; min-height:200px; border:3px solid transparent; transition:border-color .12s, background-color .3s}
-.stage.hit{border-color:var(--accent)}
-.stage.vinyl{background:#0b0908}
-/* v3.3: 盤の装飾（#disc）とシンボル（#qr）を重ねる。装飾だけ CSS で連続回転させ、シンボルは静止 */
+
+details{border-bottom:1px solid var(--ink); padding:0 0 6px; margin-bottom:12px}
+summary{cursor:pointer; font-size:14px; color:var(--muted); padding:8px 0; list-style:none}
+summary::before{content:"▸ "} details[open] summary::before{content:"▾ "}
+details .row{margin-top:4px}
+
+/* 大きなボタン（参考画像の Module/Mode の帯） */
+.go{appearance:none; border:1px solid var(--ink); border-radius:4px; font:inherit; font-weight:700; font-size:26px; line-height:1.2; padding:12px 14px; width:100%; cursor:pointer; margin:6px 0 14px; text-align:left;
+  background-color:var(--ink); color:var(--paper); background-image:radial-gradient(rgba(211,213,208,.30) .55px, transparent .95px); background-size:3px 3px}
+.go.stop{background:transparent; color:var(--ink)}
+
+/* 表示枠 */
+.stage{position:relative; background:var(--paper-2); border:1px solid var(--ink); border-radius:6px; padding:12px; display:flex; justify-content:center; align-items:center; min-height:200px; transition:background-color .3s}
+.stage.hit{outline:3px solid var(--ink); outline-offset:-3px}
+.stage.vinyl{background:#000}
 #wrap{position:relative; width:100%; max-width:min(92vw,560px); aspect-ratio:1}
-#wrap.wide{aspect-ratio:4/3}  /* v3.7 砂嵐（4:3） */
-#wrap canvas{position:absolute; inset:0; width:100%; height:100%; display:block; transform-origin:50% 50%}
+#wrap.wide{aspect-ratio:4/3}
+#wrap canvas{position:absolute; inset:0; width:100%; height:100%; display:block}
 #qr.plain{image-rendering:pixelated}
-@keyframes spin{to{transform:rotate(360deg)}}
-#disc.spin{animation:spin var(--spin,1.8s) linear infinite}
-/* v3: 回転はCSSアニメーションではなく、QR切り替えごとの離散回転（コマ送り）。表示中は静止させて動きブレを避ける */
 .stage.cam{background:#000; padding:0; overflow:hidden}
 video{width:100%; display:block; max-height:60vh; object-fit:contain}
 #guide{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); border:2px dashed rgba(255,255,255,.7); pointer-events:none; box-sizing:border-box}
-.idle{color:#6b737b; font-size:14px; text-align:center; padding:24px}
-.meter{height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin:12px 0 8px}
-.meter i{display:block; height:100%; width:0; background:var(--accent)}
-.stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:10px; margin-top:12px}
-.stat{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 10px}
-.stat b{display:block; font-size:22px; font-variant-numeric:tabular-nums; line-height:1.3}
-.stat span{font-size:12px; color:var(--muted)}
+.idle{color:var(--muted); font-size:14px; text-align:center; padding:24px}
+.stage.cam .idle{color:#9aa3ab}
+.meter{height:4px; background:var(--paper-2); border:1px solid var(--ink); margin:12px 0 6px}
+.meter i{display:block; height:100%; width:0; background:var(--ink)}
+
+/* 数値（参考画像の Grain 200ms：ラベルが上、値が大きく、下に罫線） */
+.stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); column-gap:22px; margin-top:6px}
+.stat{display:flex; flex-direction:column-reverse; padding:8px 0 6px; border-bottom:1px solid var(--ink)}
+.stat b{display:block; font-size:26px; font-weight:700; font-variant-numeric:tabular-nums; line-height:1.2; word-break:break-all}
+.stat span{font-size:13px; color:var(--ink)}
+.stat.txt b{font-size:17px; line-height:1.4}
 .note{font-size:13px; color:var(--muted); margin-top:14px}
-.err{color:var(--warn); font-size:14px; margin:8px 0; min-height:1em}
-/* v3.6 全画面（Fullscreen API が使えない Safari でも同じ見た目になるよう、CSS の固定表示で実現） */
+.err{color:var(--ink); font-weight:700; font-size:14px; margin:6px 0; min-height:1em}
+
+/* 全画面（Fullscreen API が使えない Safari でも同じ見た目になるよう、CSS の固定表示で実現） */
 .stage.full{position:fixed; inset:0; z-index:50; border-radius:0; border:0; padding:0; margin:0; background:#000; display:flex; align-items:center; justify-content:center}
 .stage.full #wrap{max-width:min(100vw,100vh); width:min(100vw,100vh)}
 .stage.full #wrap.wide{max-width:min(100vw,133.33vh); width:min(100vw,133.33vh)}
 .stage.full video{max-height:100vh; height:100vh; width:100vw; object-fit:contain}
-.fsbtn{position:absolute; right:10px; top:10px; z-index:2; appearance:none; border:1px solid rgba(255,255,255,.35); background:rgba(0,0,0,.45); color:#fff; font:inherit; font-size:13px; padding:6px 10px; border-radius:8px; cursor:pointer}
-.stage:not(.vinyl):not(.cam) .fsbtn{color:#1c2127; background:rgba(255,255,255,.7); border-color:rgba(0,0,0,.25)}
-/* v3.6 受信側 HUD：カメラ映像に重ねる */
-#hud{position:absolute; left:10px; top:10px; z-index:2; color:#fff; font-size:12px; line-height:1.5; background:rgba(0,0,0,.45); padding:6px 9px; border-radius:8px; pointer-events:none; font-variant-numeric:tabular-nums; white-space:pre}
-#zoomBox{position:absolute; left:12px; right:12px; bottom:10px; z-index:2; margin:0; background:rgba(0,0,0,.45); border-color:rgba(255,255,255,.25); color:#fff; padding:6px 12px}
-#zoomBox .hd{color:#ddd} #zoomBox .hd b{color:#fff; font-size:15px} #zoomBox input[type=range]{margin:4px 0 0}
+.fsbtn{position:absolute; right:10px; top:10px; z-index:2; appearance:none; border:1px solid rgba(255,255,255,.5); background:rgba(0,0,0,.5); color:#fff; font:inherit; font-size:13px; padding:5px 10px; border-radius:4px; cursor:pointer}
+.stage:not(.vinyl):not(.cam) .fsbtn{color:var(--ink); background:rgba(211,213,208,.8); border-color:var(--ink)}
+/* 受信側 HUD：カメラ映像に重ねる */
+#hud{position:absolute; left:10px; top:10px; z-index:2; color:#fff; font-size:12px; line-height:1.5; background:rgba(0,0,0,.5); padding:6px 9px; border-radius:4px; pointer-events:none; font-variant-numeric:tabular-nums; white-space:pre}
+#zoomBox{position:absolute; left:12px; right:12px; bottom:10px; z-index:2; margin:0; padding:6px 12px; border:1px solid rgba(255,255,255,.4); border-radius:4px; background:rgba(0,0,0,.5); color:#fff}
+#zoomBox .hd{color:#ddd; font-size:13px} #zoomBox .hd b{color:#fff; font-size:15px}
+#zoomBox input[type=range]::-webkit-slider-runnable-track{background:#fff} #zoomBox input[type=range]::-webkit-slider-thumb{background:#fff}
 [hidden]{display:none!important}
 </style>
 </head>
 <body>
 <main>
-  <h1>映すラジオ</h1>
-  <p class="lede">画面に流れるQRコードの光だけで音声を送ります。ネットワークは使いません。</p>
+  <div class="bar"><div>映すラジオ</div><div class="ver">Photophone <b>v3.9</b></div></div>
+  <p class="lede">Sound carried only by the light of a QR code on a screen. No network.</p>
 
-  <div class="seg" role="group" aria-label="モード">
-    <button id="tabTx" aria-pressed="true">送信する</button>
-    <button id="tabRx" aria-pressed="false">受信する</button>
+  <div class="seg" role="group" aria-label="Mode">
+    <button id="tabTx" aria-pressed="true">Transmit</button>
+    <button id="tabRx" aria-pressed="false">Receive</button>
   </div>
 
   <section id="txPanel">
     <div class="row">
-      <label class="field">音源
+      <label class="field">Source
         <select id="src">
-          <option value="mic">マイク</option>
-          <option value="file">音声ファイル（ループ）</option>
+          <option value="mic">Microphone</option>
+          <option value="file">Audio file (loop)</option>
         </select>
       </label>
-      <label class="field">方式
+      <label class="field">Codec
         <select id="codec">
-          <option value="adpcm" selected>ADPCM（iPhone受信可）</option>
-          <option value="opus12">Opus 12kbps（PC受信のみ）</option>
-          <option value="opus16">Opus 16kbps（PC受信のみ）</option>
+          <option value="adpcm" selected>ADPCM</option>
+          <option value="opus12">Opus 12k (PC only)</option>
+          <option value="opus16">Opus 16k (PC only)</option>
         </select>
       </label>
     </div>
     <div class="row" id="fileRow" hidden>
-      <label class="field">ファイル
+      <label class="field">File
         <input type="file" id="file" accept="audio/*">
       </label>
-      <label class="check"><input type="checkbox" id="monitor"> 送信側でも鳴らす</label>
+      <label class="check"><input type="checkbox" id="monitor"> Monitor on this device</label>
     </div>
 
     <div class="dial" id="dialBox">
-      <div class="hd"><span>音質ダイヤル</span><b id="dialName">電話</b></div>
-      <input type="range" id="dial" min="0" max="3" step="1" value="1" aria-label="音質">
-      <div class="ends"><span>蝋管</span><span>AMラジオ</span></div>
+      <div class="hd"><span>Quality</span><b id="dialName">Telephone</b></div>
+      <div class="seg quad" id="presets" role="group" aria-label="Quality">
+        <button type="button" data-i="0">Cylinder</button>
+        <button type="button" data-i="1" aria-pressed="true">Telephone</button>
+        <button type="button" data-i="2">Shortwave</button>
+        <button type="button" data-i="3">AM</button>
+      </div>
       <div class="desc" id="dialDesc"></div>
     </div>
 
     <div class="row">
-      <label class="field">コード
+      <label class="field">Code
         <select id="code">
           <option value="qr" selected>QR</option>
-          <option value="aztec">Aztec 2×2（実験用・実機で欠損大）</option>
+          <option value="aztec">Aztec 2×2 (experimental)</option>
         </select>
       </label>
-      <label class="field">見た目
+      <label class="field">Look
         <select id="look">
-          <option value="record" selected>円</option>
+          <option value="record" selected>Circle</option>
           <option value="static">4:3</option>
-          <option value="plain">コードのみ</option>
+          <option value="plain">Code only</option>
         </select>
       </label>
-      <label class="field">ドット
+      <label class="field">Dots
         <select id="dots">
-          <option value="round" selected>丸</option>
-          <option value="square">四角</option>
+          <option value="round" selected>Round</option>
+          <option value="square">Square</option>
         </select>
       </label>
     </div>
 
     <div class="row">
-      <label class="check"><input type="checkbox" id="hiss"> 砂嵐の音を鳴らす（送信端末のスピーカーで鳴らす演出。音源がマイクだと拾って送られます）</label>
+      <label class="check"><input type="checkbox" id="hiss"> Static noise (played on this device, for effect)</label>
     </div>
     <details>
-      <summary>詳細設定（ダイヤルで自動設定。変えると「カスタム」になります）</summary>
+      <summary>Advanced (set by Quality; changing makes it Custom)</summary>
       <div class="row">
-        <label class="field">サンプリングレート
+        <label class="field">Sample rate
           <select id="rate">
             <option value="3000">3 kHz</option>
             <option value="4000">4 kHz</option>
@@ -172,113 +207,113 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
             <option value="8000">8 kHz</option>
           </select>
         </label>
-        <label class="field">チャンク長
+        <label class="field">Chunk
           <select id="chunk">
-            <option value="0.025">0.025 秒（Aztec用）</option>
-            <option value="0.03">0.03 秒（Aztec用）</option>
-            <option value="0.05">0.05 秒（Aztec用）</option>
-            <option value="0.06">0.06 秒（Aztec用）</option>
-            <option value="0.24">0.24 秒</option>
-            <option value="0.32">0.32 秒</option>
-            <option value="0.48">0.48 秒</option>
+            <option value="0.025">0.025 s (Aztec)</option>
+            <option value="0.03">0.03 s (Aztec)</option>
+            <option value="0.05">0.05 s (Aztec)</option>
+            <option value="0.06">0.06 s (Aztec)</option>
+            <option value="0.24">0.24 s</option>
+            <option value="0.32">0.32 s</option>
+            <option value="0.48">0.48 s</option>
           </select>
         </label>
-        <label class="field">冗長度
+        <label class="field">Redundancy
           <select id="red">
-            <option value="2">2倍（直前も入れる）</option>
-            <option value="3">3倍（直前2つ）</option>
-            <option value="1">1倍（冗長なし）</option>
+            <option value="2">2× (previous chunk too)</option>
+            <option value="3">3× (previous two)</option>
+            <option value="1">1× (none)</option>
           </select>
         </label>
-        <label class="field">誤り訂正
+        <label class="field">Error correction
           <select id="ec">
-            <option value="L">L（7%）</option>
-            <option value="M">M（15%）</option>
+            <option value="L">L (7%)</option>
+            <option value="M">M (15%)</option>
           </select>
         </label>
-        <label class="field">遅延（受信側バッファ）
+        <label class="field">Delay (receiver buffer)
           <select id="buf">
-            <option value="1.0">1.0 秒</option>
-            <option value="1.5">1.5 秒</option>
-            <option value="2.0">2.0 秒</option>
-            <option value="3.0">3.0 秒</option>
-            <option value="4.0">4.0 秒</option>
+            <option value="1.0">1.0 s</option>
+            <option value="1.5">1.5 s</option>
+            <option value="2.0">2.0 s</option>
+            <option value="3.0">3.0 s</option>
+            <option value="4.0">4.0 s</option>
           </select>
         </label>
-        <label class="check"><input type="checkbox" id="fixver" checked> QRの大きさを固定する</label>
+        <label class="check"><input type="checkbox" id="fixver" checked> Fix QR size</label>
       </div>
     </details>
 
-    <button class="go" id="txBtn">送信を開始</button>
+    <button class="go" id="txBtn">Start transmitting</button>
     <p class="err" id="txErr"></p>
     <div class="stage" id="txStage">
-      <button class="fsbtn" id="txFull" type="button">全画面</button>
+      <button class="fsbtn" id="txFull" type="button">Full screen</button>
       <div id="wrap" hidden>
         <canvas id="disc" hidden></canvas>
         <canvas id="qr"></canvas>
       </div>
-      <div class="idle" id="txIdle">ここにコードが表示されます</div>
+      <div class="idle" id="txIdle">The code appears here</div>
     </div>
     <div class="meter" aria-hidden="true"><i id="lvl"></i></div>
     <div class="stats">
-      <div class="stat"><b id="sVer">–</b><span>コード</span></div>
-      <div class="stat"><b id="sBytes">–</b><span>1枚のバイト数</span></div>
-      <div class="stat"><b id="sRate">–</b><span>枚数／秒</span></div>
-      <div class="stat"><b id="sMod">–</b><span>モジュール数</span></div>
+      <div class="stat"><b id="sVer">–</b><span>Code</span></div>
+      <div class="stat"><b id="sBytes">–</b><span>Bytes / frame</span></div>
+      <div class="stat"><b id="sRate">–</b><span>Frames / s</span></div>
+      <div class="stat"><b id="sMod">–</b><span>Modules</span></div>
     </div>
-    <p class="note">画面の明るさを最大にしてください。音質・詳細設定の変更は次の送信開始から反映されます（見た目は即時）。</p>
+    <p class="note">Set screen brightness to maximum. Quality and Advanced changes apply from the next start (Look applies immediately). The static noise is not transmitted, but a microphone source will pick it up.</p>
   </section>
 
   <section id="rxPanel" hidden>
     <div class="row">
-      <label class="field">カメラ
-        <select id="cam"><option value="">背面（自動）</option></select>
+      <label class="field">Camera
+        <select id="cam"><option value="">Rear (auto)</option></select>
       </label>
-      <label class="field">デコーダ
+      <label class="field">Decoder
         <select id="decoder">
-          <option value="zxing" selected>ZXing（WASM・推奨）</option>
-          <option value="jsqr">jsQR（QRのみ・Aztec不可）</option>
+          <option value="zxing" selected>ZXing (recommended)</option>
+          <option value="jsqr">jsQR (QR only)</option>
         </select>
       </label>
-      <label class="field">読み取り解像度（長辺）
+      <label class="field">Scan resolution
         <select id="res">
-          <option value="800">800 px（v2と同じ）</option>
+          <option value="800">800 px</option>
           <option value="1200" selected>1200 px</option>
           <option value="1600">1600 px</option>
         </select>
       </label>
-      <label class="field">中央切り出し（デジタルズーム）
+      <label class="field">Center crop
         <select id="crop">
-          <option value="1" selected>なし</option>
-          <option value="1.5">1.5倍</option>
-          <option value="2">2倍</option>
-          <option value="3">3倍</option>
+          <option value="1" selected>Off</option>
+          <option value="1.5">1.5×</option>
+          <option value="2">2×</option>
+          <option value="3">3×</option>
         </select>
       </label>
     </div>
-    <button class="go" id="rxBtn">受信を開始</button>
+    <button class="go" id="rxBtn">Start receiving</button>
     <p class="err" id="rxErr"></p>
     <div class="stage cam" id="rxStage">
-      <button class="fsbtn" id="rxFull" type="button">全画面</button>
+      <button class="fsbtn" id="rxFull" type="button">Full screen</button>
       <video id="video" playsinline muted></video>
       <div id="guide" hidden></div>
       <div id="hud" hidden></div>
       <div class="dial" id="zoomBox" hidden>
-        <div class="hd"><span>カメラのズーム</span><b id="zoomVal">1.0×</b></div>
+        <div class="hd"><span>Camera zoom</span><b id="zoomVal">1.0×</b></div>
         <input type="range" id="zoom" min="1" max="1" step="0.1" value="1" aria-label="ズーム">
       </div>
-      <div class="idle" id="rxIdle" style="color:#9aa3ab">カメラの映像がここに表示されます</div>
+      <div class="idle" id="rxIdle" style="color:#9aa3ab">Camera view appears here</div>
     </div>
     <div class="stats">
-      <div class="stat"><b id="rRead">–</b><span>読み取り／秒</span></div>
-      <div class="stat"><b id="rScan">–</b><span>試行／秒</span></div>
-      <div class="stat"><b id="rLoss">–</b><span>欠損率（直近15秒）</span></div>
-      <div class="stat"><b id="rDelay">–</b><span>遅延（秒）</span></div>
-      <div class="stat"><b id="rCodec">–</b><span>受信中の方式</span></div>
-      <div class="stat"><b id="rCam">–</b><span>カメラ／解析</span></div>
-      <div class="stat"><b id="rDec">–</b><span>デコーダ／1回の時間</span></div>
+      <div class="stat"><b id="rRead">–</b><span>Reads / s</span></div>
+      <div class="stat"><b id="rScan">–</b><span>Scans / s</span></div>
+      <div class="stat"><b id="rLoss">–</b><span>Loss (last 15 s)</span></div>
+      <div class="stat"><b id="rDelay">–</b><span>Delay (s)</span></div>
+      <div class="stat txt"><b id="rCodec">–</b><span>Codec</span></div>
+      <div class="stat txt"><b id="rCam">–</b><span>Camera / scan</span></div>
+      <div class="stat txt"><b id="rDec">–</b><span>Decoder / time per scan</span></div>
     </div>
-    <p class="note">QRが画面の半分以上を占めるようにカメラを向けてください。バッファ時間は送信側の設定に従います。解像度・切り出し・ズームは受信中でも変えられます（解像度を上げると試行／秒が下がります）。「中央切り出し」はカメラの元画像の中央だけを解析するので、離れた位置からでも1モジュールあたりの画素数を稼げます。カメラのズームはブラウザが対応している場合だけ表示されます。iPhoneは消音モードを解除してください。</p>
+    <p class="note">Aim so the code fills more than half the view. Buffer time follows the transmitter. Resolution, crop and zoom can be changed while receiving (higher resolution lowers scans/s). Center crop analyses only the middle of the camera image, so it gains pixels per module from farther away. Camera zoom appears only where the browser supports it. On iPhone, turn off silent mode.</p>
   </section>
 </main>
 
@@ -294,11 +329,12 @@ if (typeof ZXingWASM !== 'undefined'){ try { ZXingWASM.prepareZXingModule({ fire
 /* az: Aztec のときの 1 シンボルあたりのチャンク長。1 枚は AZ_N 個のシンボル。
    1 シンボル ≈ 112 バイト（rate×chunk ≤ 200 サンプル）に収める。下の AZTEC_MAX 参照 */
 const PRESETS = [
-  { name:'蝋管',    rate:3000, chunk:0.32, az:0.06,  red:2, ec:'L', buf:1.5 },
-  { name:'電話',    rate:4000, chunk:0.24, az:0.05,  red:2, ec:'L', buf:2.0 },
-  { name:'短波',    rate:6000, chunk:0.24, az:0.03,  red:2, ec:'L', buf:3.0 },
-  { name:'AMラジオ', rate:8000, chunk:0.24, az:0.025, red:2, ec:'L', buf:4.0 },
+  { name:'Cylinder',  rate:3000, chunk:0.32, az:0.06,  red:2, ec:'L', buf:1.5 },
+  { name:'Telephone', rate:4000, chunk:0.24, az:0.05,  red:2, ec:'L', buf:2.0 },
+  { name:'Shortwave', rate:6000, chunk:0.24, az:0.03,  red:2, ec:'L', buf:3.0 },
+  { name:'AM',        rate:8000, chunk:0.24, az:0.025, red:2, ec:'L', buf:4.0 },
 ];
+let presetIdx = 1;
 /* v3.4 Aztec は 1 枚を 4 つの小さなシンボルに分ける（drawAztec のコメント参照）。
    1 シンボル 112 バイト（53 モジュール・誤り訂正 36%）までは 2.4px/モジュールから安定して読めることを確認。
    大きくするほど ZXing の Aztec 検出（ブルズアイからの外挿）が弱くなるので、これを実用上限とする。冗長 1 倍 */
@@ -308,15 +344,16 @@ const AZ_GAP = 2;  /* シンボル間の隙間（モジュール） */
 const isAztec = () => $('#code').value === 'aztec';
 /* 装飾を別層（#disc）で連続回転させ、シンボル層を静止させる描き方。Aztec、または QR のカモフラージュ */
 const isCamo = () => $('#look').value === 'record';
-/* v3.8: 回転・色・盤面の埋めの選択は撤去し、回転なし・黒白・カモフラージュに固定（本人指示 2026-10-03）。
-   旧方式（CSS コマ送り回転、セピア、薄いドット）のコードは残してあるが、これらの定数で到達しない */
-const RPM = 0, SEPIA = false, FILL = 'camo';
+/* v3.8/3.9: 回転・セピア・薄いドット埋め（v3〜v3.7）は撤去。回転なし・黒白・カモフラージュ固定（本人指示 2026-10-03） */
+const INK = '#000', PAPER = '#fff';
 function applyPreset(i){
-  const p = PRESETS[i];
+  const p = PRESETS[i]; presetIdx = i;
+  for (const b of $('#presets').children) b.setAttribute('aria-pressed', +b.dataset.i === i);
   $('#rate').value = p.rate; $('#chunk').value = String(isAztec() ? p.az : p.chunk); $('#red').value = isAztec() ? 1 : p.red; $('#ec').value = p.ec; $('#buf').value = p.buf.toFixed(1);
   $('#dialName').textContent = p.name;
   describe();
 }
+function setCustom(){ $('#dialName').textContent = 'Custom'; for (const b of $('#presets').children) b.setAttribute('aria-pressed', 'false'); }
 function readCfg(){
   return { rate:+$('#rate').value, chunk:+$('#chunk').value, red:+$('#red').value, ec:$('#ec').value, buf:+$('#buf').value, fix:$('#fixver').checked, code:$('#code').value };
 }
@@ -328,16 +365,16 @@ function packetBytes(c, codec){
 }
 function describe(){
   const c = readCfg(), codec = $('#codec').value, bytes = packetBytes(c, codec);
-  const az = isAztec(), per = az ? `約${bytes}バイト×${AZ_N}／枚　${(1 / (c.chunk * AZ_N)).toFixed(1)}枚／秒` : `約${bytes}バイト／枚　${(1 / c.chunk).toFixed(1)}枚／秒`;
-  let s = `${codec === 'adpcm' ? c.rate / 1000 + ' kHz ADPCM' : codec.replace('opus','Opus ') + 'kbps'}　${per}　冗長${c.red}倍　遅延${c.buf.toFixed(1)}秒`;
-  if (az && bytes > AZTEC_MAX) s += `　⚠ Aztec の 1 シンボル上限 ${AZTEC_MAX} バイトを超えています（チャンク長を短く・冗長度1倍）`;
+  const az = isAztec(), per = az ? `~${bytes} B × ${AZ_N} / frame · ${(1 / (c.chunk * AZ_N)).toFixed(1)} frames/s` : `~${bytes} B / frame · ${(1 / c.chunk).toFixed(1)} frames/s`;
+  let s = `${codec === 'adpcm' ? c.rate / 1000 + ' kHz ADPCM' : codec.replace('opus','Opus ') + ' kbps'} · ${per} · redundancy ${c.red}× · delay ${c.buf.toFixed(1)} s`;
+  if (az && bytes > AZTEC_MAX) s += ` · ⚠ over the Aztec per-symbol limit of ${AZTEC_MAX} B (shorten the chunk / redundancy 1×)`;
   $('#dialDesc').textContent = s;
 }
-$('#dial').oninput = () => applyPreset(+$('#dial').value);
-for (const id of ['rate','chunk','red','ec','buf']) $('#' + id).onchange = () => { $('#dialName').textContent = 'カスタム'; describe(); };
+for (const b of $('#presets').children) b.onclick = () => applyPreset(+b.dataset.i);
+for (const id of ['rate','chunk','red','ec','buf']) $('#' + id).onchange = () => { setCustom(); describe(); };
 $('#codec').onchange = describe;
 $('#code').onchange = () => {
-  if ($('#dialName').textContent !== 'カスタム') applyPreset(+$('#dial').value); else describe();
+  if ($('#dialName').textContent !== 'Custom') applyPreset(presetIdx); else describe();
   applyLook(); if (tx_ && tx_.lastPkt) drawCode(tx_, tx_.lastPkt);
 };
 applyPreset(1);
@@ -354,12 +391,12 @@ function toggleFull(id){
     el.classList.remove('full');
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   }
-  for (const b of el.querySelectorAll('.fsbtn')) b.textContent = on ? '戻る' : '全画面';
+  for (const b of el.querySelectorAll('.fsbtn')) b.textContent = on ? 'Back' : 'Full screen';
   updateGuide();
 }
 document.addEventListener('fullscreenchange', () => {
   if (document.fullscreenElement) return;
-  for (const el of document.querySelectorAll('.stage.full')){ el.classList.remove('full'); for (const b of el.querySelectorAll('.fsbtn')) b.textContent = '全画面'; }
+  for (const el of document.querySelectorAll('.stage.full')){ el.classList.remove('full'); for (const b of el.querySelectorAll('.fsbtn')) b.textContent = 'Full screen'; }
   updateGuide();
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') for (const el of document.querySelectorAll('.stage.full')) toggleFull(el.id); });
@@ -379,30 +416,12 @@ if (!hasWC){
   for (const o of $('#codec').options) if (o.value.startsWith('opus')) o.disabled = true;
   $('#codec').value = 'adpcm';
 }
-let spinAngle = 0;
 function applyLook(){
-  const cv = $('#qr'), rpm = RPM, look = $('#look').value, record = look === 'record';
-  cv.classList.toggle('plain', look === 'plain');
+  const look = $('#look').value;
+  $('#qr').classList.toggle('plain', look === 'plain');
   $('#wrap').classList.toggle('wide', look === 'static');
-  if (!record || rpm === 0){ spinAngle = 0; }
-  /* 層分離（Aztec／QR カモ）のときはシンボルを回さないので CSS の回転は使わない */
-  if (!record || rpm === 0 || isCamo()) cv.style.transform = '';
   $('#txStage').classList.toggle('vinyl', look !== 'plain');
-  /* 層分離のとき盤の装飾レイヤーを実際の回転数で連続回転させる。シンボルではないので動きブレは構わない */
-  const disc = $('#disc'), spin = isCamo() && rpm > 0;
-  disc.hidden = !isCamo();
-  disc.classList.toggle('spin', spin);
-  if (spin) disc.style.setProperty('--spin', (60 / rpm).toFixed(3) + 's');
-}
-/* QR: コードが切り替わる瞬間だけ canvas ごと CSS で回す（コマ送り）。表示中は静止（カメラの露光中に像が流れない）。
-   Aztec: ZXing の Aztec 検出は 0°/90° から ±20° までは全条件で読めるが 45° 付近はモジュールが小さいと落ちる（Node で測定）。
-   33rpm×0.24秒 ≒ 47.5°/枚 で最悪の角度を踏むので、シンボルは回さず、盤の装飾レイヤー（#disc）だけを CSS で連続回転させる。
-   中身は毎枚変わるのでシンボルが回って見えることはなく、回転の手がかりは装飾側で作る */
-function stepSpin(t){
-  const cv = $('#qr'), rpm = RPM, record = $('#look').value === 'record';
-  if (!record || rpm === 0 || isCamo()) return;
-  spinAngle = (spinAngle + 360 * t.cfg.chunk * rpm / 60) % 360;
-  cv.style.transform = 'rotate(' + spinAngle.toFixed(2) + 'deg)';
+  $('#disc').hidden = !isCamo();   /* 盤の装飾層は「円」のときだけ */
 }
 for (const id of ['look','dots']) $('#' + id).onchange = () => { applyLook(); if (tx_ && tx_.lastPkt) drawCode(tx_, tx_.lastPkt); };
 applyLook();
@@ -496,7 +515,7 @@ function parsePacket(b){
 
 /* ---------- sender ---------- */
 let tx_ = null;
-$('#txBtn').onclick = () => tx_ ? stopTx() : startTx().catch(e => { $('#txErr').textContent = '開始できませんでした：' + (e.message || e); stopTx(); });
+$('#txBtn').onclick = () => tx_ ? stopTx() : startTx().catch(e => { $('#txErr').textContent = 'Could not start: ' + (e.message || e); stopTx(); });
 
 async function startTx(){
   $('#txErr').textContent = '';
@@ -505,7 +524,7 @@ async function startTx(){
   const ctx = new AudioContext({ sampleRate: 48000 });
   await ctx.resume();
   const t = tx_ = { ctx, codec, cfg, seq: 0, hist: [], qrCount: 0, t0: performance.now(), level: 0, fixedVer: 0 };
-  $('#txBtn').textContent = '送信を停止'; $('#txBtn').classList.add('stop');
+  $('#txBtn').textContent = 'Stop transmitting'; $('#txBtn').classList.add('stop');
 
   let srcNode;
   if ($('#src').value === 'mic'){
@@ -513,7 +532,7 @@ async function startTx(){
     srcNode = ctx.createMediaStreamSource(t.stream);
   } else {
     const f = $('#file').files[0];
-    if (!f) throw new Error('音声ファイルを選んでください');
+    if (!f) throw new Error('Choose an audio file');
     const buf = await ctx.decodeAudioData(await f.arrayBuffer());
     srcNode = ctx.createBufferSource(); srcNode.buffer = buf; srcNode.loop = true; srcNode.start();
     if ($('#monitor').checked) srcNode.connect(ctx.destination);
@@ -534,7 +553,7 @@ async function startTx(){
       if (t.pend.length < AZ_N) return;
       t.lastPkt = t.pend; t.pend = [];
     } else t.lastPkt = pkt;
-    stepSpin(t); drawCode(t, t.lastPkt); t.qrCount++;
+    drawCode(t, t.lastPkt); t.qrCount++;
   };
 
   if (codec === CODEC_OPUS){
@@ -544,7 +563,7 @@ async function startTx(){
     t.enc = new AudioEncoder({
       output: c => { const b = new Uint8Array(c.byteLength); c.copyTo(b); frames.push(b);
                      if (frames.length === chunkFrames){ emit(packFrames(frames)); frames = []; } },
-      error: e => { $('#txErr').textContent = 'エンコードエラー：' + e.message; }
+      error: e => { $('#txErr').textContent = 'Encode error: ' + e.message; }
     });
     let ecfg = { codec:'opus', sampleRate: ctx.sampleRate, numberOfChannels:1, bitrate, opus:{ frameDuration: FRAME_US, application:'audio' } };
     const sup = await AudioEncoder.isConfigSupported(ecfg).catch(() => ({ supported:false }));
@@ -621,54 +640,34 @@ function drawQR(t, bytes){
   let s = ''; for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
   let qr;
   try { qr = makeQR(t, s); }
-  catch (e){ $('#txErr').textContent = 'QRに収まりませんでした。ダイヤルを下げるか冗長度を減らしてください。'; return; }
+  catch (e){ $('#txErr').textContent = 'Does not fit in a QR code. Lower the quality or redundancy.'; return; }
   const m = qr.getModuleCount(), q = 4, cells = m + q * 2;
-  const record = $('#look').value === 'record', round = $('#dots').value === 'round', sepia = SEPIA;
-  const ink = sepia ? '#2b1a0c' : '#000', paper = sepia ? '#f1e6cd' : '#fff';
+  const look = $('#look').value, round = $('#dots').value === 'round', ink = INK, paper = PAPER;
   const cv = $('#qr'), g = cv.getContext('2d');
 
-  if ($('#look').value === 'static'){
-    /* v3.7 砂嵐（4:3）：枠いっぱいを QR と同じ格子のランダムドットで埋め、QR は中央。回転なし。
-       埋めは常にカモフラージュ（盤面の埋め「なし」のときだけ白地に QR だけ） */
+  if (look === 'static'){
+    /* v3.7「4:3」：枠いっぱいを QR と同じ格子のランダムドットで埋め、QR は中央 */
     const W = 1000, H = 750, cx = W / 2, cy = H / 2;
     if (cv.width !== W || cv.height !== H){ cv.width = W; cv.height = H; }
     g.fillStyle = paper; g.fillRect(0, 0, W, H);
     const scale = Math.floor(H * 0.86) / m;
-    if (FILL === 'none'){ g.fillStyle = ink; drawModules(g, qr, m, cx - m * scale / 2, cy - m * scale / 2, scale, round); }
-    else drawQRCamo(g, qr, m, cx, cy, scale, 0, ink, round, t.qrCount || 0, [0, 0, W, H]);
-  } else if (!record){
+    drawQRCamo(g, qr, m, cx, cy, scale, 0, ink, round, t.qrCount || 0, [0, 0, W, H]);
+  } else if (look === 'plain'){
     const scale = Math.max(2, Math.floor(900 / cells));
     if (cv.width !== cells * scale || cv.height !== cells * scale){ cv.width = cv.height = cells * scale; }
     g.fillStyle = paper; g.fillRect(0, 0, cv.width, cv.height);
     g.fillStyle = ink;
     drawModules(g, qr, m, q * scale, q * scale, scale, round);
-  } else if (isCamo()){
-    /* v3.5：QR をカモフラージュ（drawQRCamo のコメント参照）。盤の装飾は #disc 層 */
+  } else {
+    /* v3.5「円」：QR をカモフラージュ（drawQRCamo のコメント参照）。盤の装飾は #disc 層 */
     const S = 1000, cx = S / 2, cy = S / 2;
     if (cv.width !== S || cv.height !== S){ cv.width = cv.height = S; }
     const labelR = Math.round(S * 0.468), block = Math.floor(labelR * 2 / Math.SQRT2) - 12;
-    const key = [S, labelR, sepia].join('|');
+    const key = [S, labelR].join('|');
     if (t.discKey !== key){ drawDisc(S, labelR); t.discKey = key; }
     g.clearRect(0, 0, S, S);
     g.fillStyle = paper; g.beginPath(); g.arc(cx, cy, labelR, 0, Math.PI * 2); g.fill();
     drawQRCamo(g, qr, m, cx, cy, block / m, labelR, ink, round, t.qrCount || 0);
-  } else {
-    const S = 1000;
-    if (cv.width !== S || cv.height !== S){ cv.width = cv.height = S; }
-    g.clearRect(0, 0, S, S);
-    const cx = S / 2, cy = S / 2;
-    g.fillStyle = '#0e0b09'; g.beginPath(); g.arc(cx, cy, S / 2 - 2, 0, Math.PI * 2); g.fill();
-    const side = Math.floor(S / 1.5), scale = Math.max(2, Math.floor(side / cells)), qrSide = cells * scale;
-    const labelR = Math.ceil(qrSide * 0.5 * Math.SQRT2) + 6;
-    g.strokeStyle = 'rgba(255,255,255,0.07)'; g.lineWidth = 1.2;
-    for (let r = labelR + 10; r < S / 2 - 12; r += 5){ g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke(); }
-    g.strokeStyle = 'rgba(255,255,255,0.16)'; g.lineWidth = 2;
-    for (const r of [labelR + 4, S / 2 - 8]){ g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke(); }
-    g.fillStyle = paper; g.beginPath(); g.arc(cx, cy, labelR, 0, Math.PI * 2); g.fill();
-    const ox = cx - qrSide / 2, oy = cy - qrSide / 2;
-    if (FILL === 'dots') drawFiller(g, ink, ox, oy, cells, scale, cx, cy, labelR, round);
-    g.fillStyle = ink;
-    drawModules(g, qr, m, ox + q * scale, oy + q * scale, scale, round);
   }
   $('#wrap').hidden = false; $('#txIdle').hidden = true;
   $('#sVer').textContent = (m - 17) / 4;
@@ -703,22 +702,6 @@ function drawQRCamo(g, qr, m, cx, cy, scale, labelR, ink, round, frame, rect){
     else g.fillRect(x, y, scale + 0.3, scale + 0.3);
   }
   drawModules(g, qr, m, ox, oy, scale, round);
-}
-/* （v3 の旧方式、見た目「盤面の埋め：薄いドット（旧）」）ラベル円のうちQR（クワイエットゾーン込み）の外側を、薄いドットで埋めて四角い輪郭を消す。
-   濃さ30%は jsQR の二値化で「白」側に落ちることを確認済み（v22〜v32、ぼかし付きで検証）。
-   配置は固定シード乱数なので毎枚同じ模様になり、回転時に模様が一緒に回る */
-function drawFiller(g, ink, ox, oy, cells, scale, cx, cy, labelR, round){
-  let seed = 7; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
-  const ext = Math.ceil(labelR / scale) + 2, lim = (labelR - scale) * (labelR - scale);
-  g.save(); g.fillStyle = ink; g.globalAlpha = 0.3;
-  for (let r = -ext; r <= cells + ext; r++) for (let c = -ext; c <= cells + ext; c++){
-    if (r >= -1 && r < cells + 1 && c >= -1 && c < cells + 1) continue; /* QR＋クワイエットゾーン＋1モジュールは空ける */
-    const x = ox + c * scale, y = oy + r * scale, dx = x + scale / 2 - cx, dy = y + scale / 2 - cy;
-    if (dx * dx + dy * dy > lim || rnd() >= 0.5) continue;
-    if (round){ g.beginPath(); g.arc(x + scale / 2, y + scale / 2, scale * 0.6, 0, Math.PI * 2); g.fill(); }
-    else g.fillRect(x, y, scale, scale);
-  }
-  g.restore();
 }
 function drawModules(g, qr, m, ox, oy, scale, round){
   const rad = scale * 0.6;
@@ -758,7 +741,7 @@ async function aztecMatrix(bytes){
 function drawCode(t, bytes){
   if (!isAztec()) return drawQR(t, bytes);
   if (typeof ZXingWASM === 'undefined' || !ZXingWASM.writeBarcode){
-    $('#txErr').textContent = 'ZXing（writer）を読み込めていないので Aztec は使えません。QR に切り替えます。';
+    $('#txErr').textContent = 'ZXing writer not loaded; Aztec unavailable. Switching to QR.';
     $('#code').value = 'qr'; applyLook(); return;
   }
   const pkts = Array.isArray(bytes) ? bytes : [bytes];
@@ -767,12 +750,11 @@ function drawCode(t, bytes){
     if (t.drawSeq !== seq || tx_ !== t) return;   /* 生成中に次の枚が来ていたら捨てる */
     $('#txErr').textContent = '';
     drawAztec(t, Ms, pkts.reduce((a, b) => a + b.length, 0), seq);
-  }).catch(e => { $('#txErr').textContent = 'Aztec に収まりませんでした。チャンク長を短くしてください。'; });
+  }).catch(e => { $('#txErr').textContent = 'Does not fit in Aztec. Shorten the chunk.'; });
 }
 function drawAztec(t, Ms, nbytes, frame){
   const n = Math.max(...Ms.map(M => M.length)), cells = 2 * n + AZ_GAP;
-  const record = $('#look').value === 'record', round = $('#dots').value === 'round', sepia = SEPIA;
-  const ink = sepia ? '#2b1a0c' : '#000', paper = sepia ? '#f1e6cd' : '#fff';
+  const record = $('#look').value === 'record', round = $('#dots').value === 'round', ink = INK, paper = PAPER;
   const cv = $('#qr'), g = cv.getContext('2d');
   /* 4 つを 2×2 に置く。シンボルの大きさが揃わない枚はそれぞれ枠の中央に */
   const place = (o, scale) => Ms.map((M, q) => { const off = (n - M.length) / 2 * scale;
@@ -788,12 +770,12 @@ function drawAztec(t, Ms, nbytes, frame){
     if (cv.width !== S || cv.height !== S){ cv.width = cv.height = S; }
     const labelR = Math.round(S * 0.468), block = Math.floor(labelR * 2 / Math.SQRT2) - 12;   /* 2×2 の対角がラベル円に収まる大きさ */
     const scale = block / cells, o = cx - block / 2;
-    const key = [S, labelR, sepia].join('|');
+    const key = [S, labelR].join('|');
     if (t.discKey !== key){ drawDisc(S, labelR); t.discKey = key; }
     g.clearRect(0, 0, S, S);
     g.fillStyle = paper; g.beginPath(); g.arc(cx, cy, labelR, 0, Math.PI * 2); g.fill();
     g.fillStyle = ink;
-    if (FILL !== 'none'){
+    {
       /* カモフラージュ：シンボルの枠の外を同じ格子でランダムに埋める。乱数は枚ごとに変える */
       let seed = (frame * 2654435761) >>> 0 || 7; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
       /* 占有判定は各シンボルの実寸で（小さいシンボルを枠の中央に置いた余りもカモで埋める） */
@@ -847,8 +829,8 @@ function aztecModules(g, M, ox, oy, scale, round){
 }
 function stopTx(){
   const t = tx_; tx_ = null;
-  $('#txBtn').textContent = '送信を開始'; $('#txBtn').classList.remove('stop');
-  $('#wrap').hidden = true; $('#qr').style.transform = ''; spinAngle = 0; $('#txIdle').hidden = false; $('#lvl').style.width = '0';
+  $('#txBtn').textContent = 'Start transmitting'; $('#txBtn').classList.remove('stop');
+  $('#wrap').hidden = true; $('#txIdle').hidden = false; $('#lvl').style.width = '0';
   if (!t) return;
   clearInterval(t.timer);
   setHiss(t, false);
@@ -861,13 +843,13 @@ function stopTx(){
 
 /* ---------- receiver ---------- */
 let rx = null;
-$('#rxBtn').onclick = () => rx ? stopRx() : startRx().catch(e => { $('#rxErr').textContent = '開始できませんでした：' + (e.message || e); stopRx(); });
+$('#rxBtn').onclick = () => rx ? stopRx() : startRx().catch(e => { $('#rxErr').textContent = 'Could not start: ' + (e.message || e); stopRx(); });
 
 async function startRx(){
   $('#rxErr').textContent = '';
   const actx = new AudioContext(); await actx.resume();
   const r = rx = { actx, reads: 0, t0: performance.now(), recent: [], scans: [], started: false, lastRecv: -1e9 };
-  $('#rxBtn').textContent = '受信を停止'; $('#rxBtn').classList.add('stop');
+  $('#rxBtn').textContent = 'Stop receiving'; $('#rxBtn').classList.add('stop');
   r.out = actx.createGain(); r.out.connect(actx.destination);
   const camId = $('#cam').value;
   const vc = camId ? { deviceId:{ exact: camId } } : { facingMode:{ ideal:'environment' } };
@@ -879,7 +861,7 @@ async function startRx(){
   r.canvas = document.createElement('canvas');
   r.g = r.canvas.getContext('2d', { willReadFrequently:true });
   if (hasWC){
-    r.dec = new AudioDecoder({ output: ad => onDecoded(r, ad), error: e => { $('#rxErr').textContent = 'デコードエラー：' + e.message; } });
+    r.dec = new AudioDecoder({ output: ad => onDecoded(r, ad), error: e => { $('#rxErr').textContent = 'Decode error: ' + e.message; } });
     r.dec.configure({ codec:'opus', sampleRate:48000, numberOfChannels:1 });
   }
   r.zx = typeof ZXingWASM !== 'undefined';
@@ -902,12 +884,12 @@ async function listCameras(){
   try {
     const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
     const sel = $('#cam'), cur = sel.value;
-    sel.innerHTML = '<option value="">背面（自動）</option>';
-    for (const d of devs){ const o = document.createElement('option'); o.value = d.deviceId; o.textContent = d.label || 'カメラ ' + (sel.length); sel.appendChild(o); }
+    sel.innerHTML = '<option value="">Rear (auto)</option>';
+    for (const d of devs){ const o = document.createElement('option'); o.value = d.deviceId; o.textContent = d.label || 'Camera ' + (sel.length); sel.appendChild(o); }
     sel.value = cur;
   } catch {}
 }
-$('#cam').onchange = () => { if (rx){ stopRx(); startRx().catch(e => { $('#rxErr').textContent = '開始できませんでした：' + (e.message || e); stopRx(); }); } };
+$('#cam').onchange = () => { if (rx){ stopRx(); startRx().catch(e => { $('#rxErr').textContent = 'Could not start: ' + (e.message || e); stopRx(); }); } };
 /* ブラウザがズーム制約に対応していればスライダーを出す（iOS 17以降のSafari、Android Chrome）。
    多くの機種でこれは光学ではなくセンサー切り出しだが、1080p出力の中で切り出すので「中央切り出し」より画素が残る */
 function setupZoom(r){
@@ -943,7 +925,7 @@ async function scan(r){
   r.g.drawImage(v, sx, sy, sw, sh, 0, 0, w, h);
   const img = r.g.getImageData(0, 0, w, h);
   r.scans.push(performance.now());
-  r.camInfo = v.videoWidth + '×' + v.videoHeight + (crop > 1 ? ' 中央1/' + crop : '') + ' → ' + w + '×' + h;
+  r.camInfo = v.videoWidth + '×' + v.videoHeight + (crop > 1 ? ' center 1/' + crop : '') + ' → ' + w + '×' + h;
   const useZx = r.zx && $('#decoder').value === 'zxing', t0 = performance.now();
   const found = [];
   if (useZx){
@@ -966,7 +948,7 @@ function onPacket(r, bytes){
   r.reads++; r.recent.push(performance.now());
   const st = $('#rxStage'); st.classList.add('hit'); clearTimeout(r.flash);
   r.flash = setTimeout(() => st.classList.remove('hit'), 120);
-  if (p.codec === CODEC_OPUS && !r.dec){ $('#rxErr').textContent = 'このブラウザはOpusを再生できません。送信側をADPCMにしてください。'; return; }
+  if (p.codec === CODEC_OPUS && !r.dec){ $('#rxErr').textContent = 'This browser cannot play Opus. Set the transmitter to ADPCM.'; return; }
   r.lastRecv = r.actx.currentTime;
   for (const c of p.chunks){
     if (!r.started || r.codec !== p.codec || r.rate !== p.rate){
@@ -1050,7 +1032,7 @@ function schedule(r){
 function rxHud(r){
   const h = $('#hud'); if (!rx){ h.hidden = true; return; }
   const g = id => $('#' + id).textContent;
-  h.textContent = `読取 ${g('rRead')}/秒　試行 ${g('rScan')}/秒\n欠損 ${g('rLoss')}　遅延 ${g('rDelay')}秒\n${g('rCodec')}\n${g('rDec')}\n${g('rCam')}`;
+  h.textContent = `reads ${g('rRead')}/s · scans ${g('rScan')}/s\nloss ${g('rLoss')} · delay ${g('rDelay')} s\n${g('rCodec')}\n${g('rDec')}\n${g('rCam')}`;
   h.hidden = false;
 }
 function rxStats(r){
@@ -1068,13 +1050,13 @@ function rxStats(r){
     $('#rLoss').textContent = Math.round(lost / r.hist.length * 100) + '%';
     $('#rDelay').textContent = Math.max(0, (r.lastAbs - r.nextAbs) * r.chunkSec + (r.nextTime - r.actx.currentTime)).toFixed(1);
   } else if (r.started && !signal){
-    $('#rLoss').textContent = '信号なし';
+    $('#rLoss').textContent = 'no signal';
   }
   rxHud(r);
 }
 function stopRx(){
   const r = rx; rx = null;
-  $('#rxBtn').textContent = '受信を開始'; $('#rxBtn').classList.remove('stop');
+  $('#rxBtn').textContent = 'Start receiving'; $('#rxBtn').classList.remove('stop');
   $('#rxIdle').hidden = false; $('#guide').hidden = true; $('#zoomBox').hidden = true; $('#hud').hidden = true;
   if (!r) return;
   cancelAnimationFrame(r.raf); clearInterval(r.tick); clearInterval(r.ui); r.busy = true;
