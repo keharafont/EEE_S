@@ -206,10 +206,10 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
     <div class="dial" id="dialBox">
       <div class="hd"><span>Quality</span><b id="dialName">Telephone</b></div>
       <div class="seg quad icons" id="presets" role="group" aria-label="Quality">
-        <button type="button" data-i="0"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16C8.5 10 11 5.5 15 2.5"/><path d="M8 16c5 .5 9.5-1.5 13.5-5"/><path d="M15 2.5a6 6 0 0 1 6.5 8.5"/><path d="M8 16l-3.5 4M2 21h6"/></svg><span>Cylinder</span></button>
+        <button type="button" data-i="0"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" stroke="none" d="M7 12C8.5 7.5 9.5 4 11.15 1.3L19.25 10.9C16 12.5 12 13.6 8.2 13.2Z"/><ellipse cx="15.2" cy="6.1" rx="6.3" ry="2.4" transform="rotate(50 15.2 6.1)" fill="currentColor" stroke="none"/><path fill="none" stroke="currentColor" stroke-width="2.2" d="M7.5 12.8C4.5 12.5 3.5 15 5 16.8C6.3 18.2 6.8 18.8 6.8 19.6"/><rect x="3.5" y="19.4" width="12" height="3.3" rx=".6" fill="currentColor" stroke="none"/></svg><span>Cylinder</span></button>
         <button type="button" data-i="1" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h3l2 5-2.5 1.5a11 11 0 0 0 6 6L15 14l5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg><span>Telephone</span></button>
-        <button type="button" data-i="2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21l-4-11h8z"/><path d="M8.5 7a5 5 0 0 1 7 0M6 4.5a9 9 0 0 1 12 0"/></svg><span>Shortwave</span></button>
-        <button type="button" data-i="3"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="9" width="18" height="11" rx="2"/><circle cx="16" cy="14.5" r="2.5"/><path d="M6 13h5M6 16h5M7 9l8-5"/></svg><span>AM</span></button>
+        <button type="button" data-i="2"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="16" cy="16" r="2.2"/><path d="M6 14.5h5M6 17.5h5M7 11l8-6"/><path d="M17.5 3.5a3.5 3.5 0 0 1 0 5M20 1.5a7 7 0 0 1 0 9"/></svg><span>SW</span></button>
+        <button type="button" data-i="3"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="16" cy="16" r="2.2"/><path d="M6 14.5h5M6 17.5h5M7 11l8-6"/></svg><span>AM</span></button>
       </div>
       <div class="desc" id="dialDesc"></div>
     </div>
@@ -362,7 +362,7 @@ if (typeof ZXingWASM !== 'undefined'){ try { ZXingWASM.prepareZXingModule({ fire
 const PRESETS = [
   { name:'Cylinder',  rate:3000, chunk:0.32, red:2, ec:'L', buf:1.5 },
   { name:'Telephone', rate:4000, chunk:0.24, red:2, ec:'L', buf:2.0 },
-  { name:'Shortwave', rate:6000, chunk:0.24, red:2, ec:'L', buf:3.0 },
+  { name:'SW',        rate:6000, chunk:0.24, red:2, ec:'L', buf:3.0 },
   { name:'AM',        rate:8000, chunk:0.24, red:2, ec:'L', buf:4.0 },
 ];
 let presetIdx = 1;
