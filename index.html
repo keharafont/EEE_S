@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>映すラジオ — Projected Radio v3.15</title>
+<title>映すラジオ — Projected Radio v3.16</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Noto+Serif:wght@400;700&display=swap" rel="stylesheet">
@@ -12,8 +12,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Zen+Antique&text=%E6%98%A0%E3%81%99%E3%83%A9%E3%82%B8%E3%82%AA&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<!-- v3.3: reader → full（Aztec の生成に writer が要る。.wasm 約1.4MB は jsDelivr から自動取得） -->
-<script src="https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.4/dist/iife/full/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.4/dist/iife/reader/index.js"></script>
 <style>
 /* v3.9 電子ペーパー風の単色デザイン（本人提示の参考画像：グレーの地・濃いインク・セリフ体・細い罫線・ディザの帯） */
 :root{
@@ -173,11 +172,11 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
       <div class="hint">Scan to open this page on a phone. Tap anywhere to close.</div>
     </div>
   </div>
-  <p class="lede">Sound carried only by the light of a QR code on a screen. No network. <span class="v">v3.15</span></p>
+  <p class="lede">Sound carried only by the light of a QR code on a screen. No network. <span class="v">v3.16</span></p>
 
   <div class="seg" role="group" aria-label="Mode">
-    <button id="tabTx" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="13" height="10" rx="1"/><path d="M7 19h5M9.5 15v4"/><path d="M18.5 8a4 4 0 0 1 0 4M21 6a7.5 7.5 0 0 1 0 8"/></svg><span>Transmit</span></button>
-    <button id="tabRx" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M11 5.5h2"/></svg><span>Receive</span></button>
+    <button id="tabTx" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="13" height="10" rx="1"/><path d="M6.5 19h5M9 15v4"/><path d="M18.5 8a4 4 0 0 1 0 4M21 6a7.5 7.5 0 0 1 0 8"/></svg><span>Transmit</span></button>
+    <button id="tabRx" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="5" width="13" height="10" rx="1"/><path d="M12.5 19h5M15 15v4"/><path d="M5.5 8a4 4 0 0 0 0 4M3 6a7.5 7.5 0 0 0 0 8"/></svg><span>Receive</span></button>
   </div>
 
   <section id="txPanel">
@@ -207,7 +206,7 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
     <div class="dial" id="dialBox">
       <div class="hd"><span>Quality</span><b id="dialName">Telephone</b></div>
       <div class="seg quad icons" id="presets" role="group" aria-label="Quality">
-        <button type="button" data-i="0"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12M6 17h12"/><ellipse cx="6" cy="12" rx="2.2" ry="5"/><ellipse cx="18" cy="12" rx="2.2" ry="5"/><path d="M10 7.3v9.4M14 7.3v9.4" stroke-dasharray="1.2 1.6"/></svg><span>Cylinder</span></button>
+        <button type="button" data-i="0"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16C8.5 10 11 5.5 15 2.5"/><path d="M8 16c5 .5 9.5-1.5 13.5-5"/><path d="M15 2.5a6 6 0 0 1 6.5 8.5"/><path d="M8 16l-3.5 4M2 21h6"/></svg><span>Cylinder</span></button>
         <button type="button" data-i="1" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h3l2 5-2.5 1.5a11 11 0 0 0 6 6L15 14l5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg><span>Telephone</span></button>
         <button type="button" data-i="2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21l-4-11h8z"/><path d="M8.5 7a5 5 0 0 1 7 0M6 4.5a9 9 0 0 1 12 0"/></svg><span>Shortwave</span></button>
         <button type="button" data-i="3"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="9" width="18" height="11" rx="2"/><circle cx="16" cy="14.5" r="2.5"/><path d="M6 13h5M6 16h5M7 9l8-5"/></svg><span>AM</span></button>
@@ -216,12 +215,6 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
     </div>
 
     <div class="row">
-      <div class="opt"><span>Code</span><div class="seg icons" id="g_code"></div>
-        <select id="code" hidden>
-          <option value="qr" selected>QR</option>
-          <option value="aztec">Aztec 2×2 (experimental)</option>
-        </select>
-      </div>
       <div class="opt"><span>Look</span><div class="seg icons" id="g_look"></div>
         <select id="look" hidden>
           <option value="record" selected>Circle</option>
@@ -253,10 +246,6 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
         </label>
         <label class="field">Chunk
           <select id="chunk">
-            <option value="0.025">0.025 s (Aztec)</option>
-            <option value="0.03">0.03 s (Aztec)</option>
-            <option value="0.05">0.05 s (Aztec)</option>
-            <option value="0.06">0.06 s (Aztec)</option>
             <option value="0.24">0.24 s</option>
             <option value="0.32">0.32 s</option>
             <option value="0.48">0.48 s</option>
@@ -288,7 +277,7 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
       </div>
     </details>
 
-    <button class="go" id="txBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="13" height="10" rx="1"/><path d="M7 19h5M9.5 15v4"/><path d="M18.5 8a4 4 0 0 1 0 4M21 6a7.5 7.5 0 0 1 0 8"/></svg><span>Start</span></button>
+    <button class="go" id="txBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="13" height="10" rx="1"/><path d="M6.5 19h5M9 15v4"/><path d="M18.5 8a4 4 0 0 1 0 4M21 6a7.5 7.5 0 0 1 0 8"/></svg><span>Start</span></button>
     <p class="err" id="txErr"></p>
     <div class="stage" id="txStage">
       <button class="fsbtn" id="txFull" type="button">Full screen</button>
@@ -315,7 +304,7 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
       <div class="opt"><span>Decoder</span><div class="seg icons" id="g_decoder"></div>
         <select id="decoder" hidden>
           <option value="zxing" selected>ZXing (recommended)</option>
-          <option value="jsqr">jsQR (QR only)</option>
+          <option value="jsqr">jsQR</option>
         </select>
       </div>
       <div class="opt"><span>Resolution</span><div class="seg icons" id="g_res"></div>
@@ -334,7 +323,7 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
         </select>
       </div>
     </div>
-    <button class="go" id="rxBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M11 5.5h2"/></svg><span>Start</span></button>
+    <button class="go" id="rxBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="5" width="13" height="10" rx="1"/><path d="M12.5 19h5M15 15v4"/><path d="M5.5 8a4 4 0 0 0 0 4M3 6a7.5 7.5 0 0 0 0 8"/></svg><span>Start</span></button>
     <p class="err" id="rxErr"></p>
     <div class="stage cam" id="rxStage">
       <button class="fsbtn" id="rxFull" type="button">Full screen</button>
@@ -370,36 +359,27 @@ const hasWC = typeof AudioEncoder !== 'undefined' && typeof AudioDecoder !== 'un
 if (typeof ZXingWASM !== 'undefined'){ try { ZXingWASM.prepareZXingModule({ fireImmediately:true }); } catch {} }
 
 /* ---------- presets ---------- */
-/* az: Aztec のときの 1 シンボルあたりのチャンク長。1 枚は AZ_N 個のシンボル。
-   1 シンボル ≈ 112 バイト（rate×chunk ≤ 200 サンプル）に収める。下の AZTEC_MAX 参照 */
 const PRESETS = [
-  { name:'Cylinder',  rate:3000, chunk:0.32, az:0.06,  red:2, ec:'L', buf:1.5 },
-  { name:'Telephone', rate:4000, chunk:0.24, az:0.05,  red:2, ec:'L', buf:2.0 },
-  { name:'Shortwave', rate:6000, chunk:0.24, az:0.03,  red:2, ec:'L', buf:3.0 },
-  { name:'AM',        rate:8000, chunk:0.24, az:0.025, red:2, ec:'L', buf:4.0 },
+  { name:'Cylinder',  rate:3000, chunk:0.32, red:2, ec:'L', buf:1.5 },
+  { name:'Telephone', rate:4000, chunk:0.24, red:2, ec:'L', buf:2.0 },
+  { name:'Shortwave', rate:6000, chunk:0.24, red:2, ec:'L', buf:3.0 },
+  { name:'AM',        rate:8000, chunk:0.24, red:2, ec:'L', buf:4.0 },
 ];
 let presetIdx = 1;
-/* v3.4 Aztec は 1 枚を 4 つの小さなシンボルに分ける（drawAztec のコメント参照）。
-   1 シンボル 112 バイト（53 モジュール・誤り訂正 36%）までは 2.4px/モジュールから安定して読めることを確認。
-   大きくするほど ZXing の Aztec 検出（ブルズアイからの外挿）が弱くなるので、これを実用上限とする。冗長 1 倍 */
-const AZTEC_MAX = 112;
-const AZ_N = 4;    /* 1 枚あたりのシンボル数（2×2） */
-const AZ_GAP = 2;  /* シンボル間の隙間（モジュール） */
-const isAztec = () => $('#code').value === 'aztec';
-/* 装飾を別層（#disc）で連続回転させ、シンボル層を静止させる描き方。Aztec、または QR のカモフラージュ */
+/* v3.16: Aztec（v3.3〜v3.15、2×2 ＋カモ）は実機の欠損が大きく実用性が低いため撤去（本人指示 2026-10-04）。経緯は進捗メモ */
 const isCamo = () => $('#look').value === 'record';
 /* v3.8/3.9: 回転・セピア・薄いドット埋め（v3〜v3.7）は撤去。回転なし・黒白・カモフラージュ固定（本人指示 2026-10-03） */
 const INK = '#000', PAPER = '#fff';
 function applyPreset(i){
   const p = PRESETS[i]; presetIdx = i;
   for (const b of $('#presets').children) b.setAttribute('aria-pressed', +b.dataset.i === i);
-  $('#rate').value = p.rate; $('#chunk').value = String(isAztec() ? p.az : p.chunk); $('#red').value = isAztec() ? 1 : p.red; $('#ec').value = p.ec; $('#buf').value = p.buf.toFixed(1);
+  $('#rate').value = p.rate; $('#chunk').value = String(p.chunk); $('#red').value = p.red; $('#ec').value = p.ec; $('#buf').value = p.buf.toFixed(1);
   $('#dialName').textContent = p.name;
   describe();
 }
 function setCustom(){ $('#dialName').textContent = 'Custom'; for (const b of $('#presets').children) b.setAttribute('aria-pressed', 'false'); }
 function readCfg(){
-  return { rate:+$('#rate').value, chunk:+$('#chunk').value, red:+$('#red').value, ec:$('#ec').value, buf:+$('#buf').value, fix:$('#fixver').checked, code:$('#code').value };
+  return { rate:+$('#rate').value, chunk:+$('#chunk').value, red:+$('#red').value, ec:$('#ec').value, buf:+$('#buf').value, fix:$('#fixver').checked };
 }
 function packetBytes(c, codec){
   let perChunk;
@@ -409,18 +389,11 @@ function packetBytes(c, codec){
 }
 function describe(){
   const c = readCfg(), codec = $('#codec').value, bytes = packetBytes(c, codec);
-  const az = isAztec(), per = az ? `~${bytes} B × ${AZ_N} / frame · ${(1 / (c.chunk * AZ_N)).toFixed(1)} frames/s` : `~${bytes} B / frame · ${(1 / c.chunk).toFixed(1)} frames/s`;
-  let s = `${codec === 'adpcm' ? c.rate / 1000 + ' kHz ADPCM' : codec.replace('opus','Opus ') + ' kbps'} · ${per} · redundancy ${c.red}× · delay ${c.buf.toFixed(1)} s`;
-  if (az && bytes > AZTEC_MAX) s += ` · ⚠ over the Aztec per-symbol limit of ${AZTEC_MAX} B (shorten the chunk / redundancy 1×)`;
-  $('#dialDesc').textContent = s;
+  $('#dialDesc').textContent = `${codec === 'adpcm' ? c.rate / 1000 + ' kHz ADPCM' : codec.replace('opus','Opus ') + ' kbps'} · ~${bytes} B / frame · ${(1 / c.chunk).toFixed(1)} frames/s · redundancy ${c.red}× · delay ${c.buf.toFixed(1)} s`;
 }
 for (const b of $('#presets').children) b.onclick = () => applyPreset(+b.dataset.i);
 for (const id of ['rate','chunk','red','ec','buf']) $('#' + id).onchange = () => { setCustom(); describe(); };
 $('#codec').onchange = describe;
-$('#code').onchange = () => {
-  if ($('#dialName').textContent !== 'Custom') applyPreset(presetIdx); else describe();
-  applyLook(); if (tx_ && tx_.lastPkt) drawCode(tx_, tx_.lastPkt);
-};
 applyPreset(1);
 
 /* ---------- v3.6 全画面 ----------
@@ -449,8 +422,8 @@ $('#rxFull').onclick = () => toggleFull('rxStage');
 
 /* Start／Stop ボタンの表示（アイコン＋一語） */
 const GO_ICONS = {
-  tx:'<rect x="3" y="5" width="13" height="10" rx="1"/><path d="M7 19h5M9.5 15v4"/><path d="M18.5 8a4 4 0 0 1 0 4M21 6a7.5 7.5 0 0 1 0 8"/>',
-  rx:'<rect x="7" y="2.5" width="10" height="19" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M11 5.5h2"/>',
+  tx:'<rect x="2.5" y="5" width="13" height="10" rx="1"/><path d="M6.5 19h5M9 15v4"/><path d="M18.5 8a4 4 0 0 1 0 4M21 6a7.5 7.5 0 0 1 0 8"/>',
+  rx:'<rect x="8.5" y="5" width="13" height="10" rx="1"/><path d="M12.5 19h5M15 15v4"/><path d="M5.5 8a4 4 0 0 0 0 4M3 6a7.5 7.5 0 0 0 0 8"/>',
   stop:'<rect x="6" y="6" width="12" height="12"/>',
 };
 function setGo(btn, label, icon){ btn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + GO_ICONS[icon] + '</svg><span>' + label + '</span>'; }
@@ -460,14 +433,13 @@ function setGo(btn, label, icon){ btn.innerHTML = '<svg viewBox="0 0 24 24" aria
 const ICONS = {
   src:   { mic:'<path d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3z"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6"/>', file:'<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M10 16.5a1.5 1.5 0 1 0 3 0V11l3-1"/>' },
   codec: { adpcm:'<path d="M3 15h3v-6h3v9h3V6h3v12h3v-6h3"/>', opus12:'<path d="M3 12c2-6 4-6 6 0s4 6 6 0 4-6 6 0"/>', opus16:'<path d="M3 12c1.5-8 3-8 4.5 0s3 8 4.5 0 3-8 4.5 0 3 8 4.5 0"/>' },
-  code:  { qr:'<path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2z"/>', aztec:'<path d="M4 4h16v16H4z"/><path d="M8 8h8v8H8z"/><path d="M11 11h2v2h-2z"/>' },
   look:  { record:'<circle cx="12" cy="12" r="8.5"/>', static:'<rect x="3" y="5.5" width="18" height="13.5"/>', plain:'<rect x="5" y="5" width="14" height="14"/>' },
   dots:  { round:'<circle cx="8" cy="8" r="2.2"/><circle cx="16" cy="8" r="2.2"/><circle cx="8" cy="16" r="2.2"/><circle cx="16" cy="16" r="2.2"/>', square:'<rect x="5.5" y="5.5" width="4.5" height="4.5"/><rect x="14" y="5.5" width="4.5" height="4.5"/><rect x="5.5" y="14" width="4.5" height="4.5"/><rect x="14" y="14" width="4.5" height="4.5"/>' },
   decoder: { zxing:'<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 12h8M12 8v8"/>', jsqr:'<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 15l3-6 3 6M15 9v6"/>' },
   res:   { 800:'<rect x="6" y="7" width="12" height="10"/>', 1200:'<rect x="4" y="6" width="16" height="12"/>', 1600:'<rect x="2.5" y="4.5" width="19" height="15"/>' },
   crop:  { 1:'<rect x="4" y="4" width="16" height="16"/>', 1.5:'<rect x="4" y="4" width="16" height="16"/><rect x="7" y="7" width="10" height="10"/>', 2:'<rect x="4" y="4" width="16" height="16"/><rect x="8" y="8" width="8" height="8"/>', 3:'<rect x="4" y="4" width="16" height="16"/><rect x="9.5" y="9.5" width="5" height="5"/>' },
 };
-const SHORT = { 'Microphone':'Mic', 'Audio file (loop)':'File', 'Opus 12k (PC only)':'Opus 12k', 'Opus 16k (PC only)':'Opus 16k', 'Aztec 2×2 (experimental)':'Aztec', 'ZXing (recommended)':'ZXing', 'jsQR (QR only)':'jsQR', 'Code only':'Code', '800 px':'800', '1200 px':'1200', '1600 px':'1600' };
+const SHORT = { 'Microphone':'Mic', 'Audio file (loop)':'File', 'Opus 12k (PC only)':'Opus 12k', 'Opus 16k (PC only)':'Opus 16k', 'ZXing (recommended)':'ZXing', 'Code only':'Code', '800 px':'800', '1200 px':'1200', '1600 px':'1600' };
 function buildIcons(id){
   const sel = $('#' + id), box = $('#g_' + id); if (!box) return;
   box.replaceChildren();
@@ -481,7 +453,7 @@ function buildIcons(id){
   syncIcons(id);
 }
 function syncIcons(id){ const sel = $('#' + id), box = $('#g_' + id); if (!box) return; for (const b of box.children){ b.setAttribute('aria-pressed', b.dataset.v === sel.value); b.disabled = sel.options[[...sel.options].findIndex(o => o.value === b.dataset.v)]?.disabled || false; } }
-const ICON_SELECTS = ['src','codec','code','look','dots','decoder','res','crop'];
+const ICON_SELECTS = ['src','codec','look','dots','decoder','res','crop'];
 
 /* ---------- v3.12 ページ共有 QR ----------
    このページのアドレス（クエリやハッシュは除く）を QR にして重ねて表示する。送信用の QR とは無関係。
@@ -637,8 +609,8 @@ function dummyPacket(t){
 }
 function startDummy(t, closeCtx){
   clearFade(); fade = { t, closeCtx };
-  const tick = () => { t.lastPkt = isAztec() ? Array.from({ length: AZ_N }, () => dummyPacket(t)) : dummyPacket(t); drawCode(t, t.lastPkt); };
-  tick(); fade.dummy = setInterval(tick, t.cfg.chunk * 1000 * (isAztec() ? AZ_N : 1));
+  const tick = () => { t.lastPkt = dummyPacket(t); drawCode(t, t.lastPkt); };
+  tick(); fade.dummy = setInterval(tick, t.cfg.chunk * 1000);
 }
 
 async function startTx(){
@@ -672,13 +644,7 @@ async function startTx(){
     if (!t.live) return;   /* フェードイン中はダミーを映しているので捨てる */
     const cur = { seq: t.seq & 0xffff, data }; t.seq++;
     t.hist.unshift(cur); if (t.hist.length > cfg.red) t.hist.length = cfg.red;
-    const pkt = buildPacket(codec, rateForHeader, cfg.buf, t.hist);
-    if (isAztec()){
-      /* Aztec は AZ_N パケット（＝AZ_N チャンク）を 1 枚にまとめて表示する */
-      t.pend = t.pend || []; t.pend.push(pkt);
-      if (t.pend.length < AZ_N) return;
-      t.lastPkt = t.pend; t.pend = [];
-    } else t.lastPkt = pkt;
+    t.lastPkt = buildPacket(codec, rateForHeader, cfg.buf, t.hist);
     drawCode(t, t.lastPkt); t.qrCount++;
   };
 
@@ -846,91 +812,11 @@ function drawModules(g, qr, m, ox, oy, scale, round){
   }
 }
 
-/* ---------- v3.4 Aztec 2×2 ＋ カモフラージュ ----------
-   経緯：
-   v3.3 で「大きな Aztec を内接円で切り抜く」を試したが、ZXing の Aztec 検出は中央ブルズアイから外周を外挿するため
-   (1) 切り抜きで誤り訂正の余裕を使い切ると画素の位相だけで落ちる、(2) そもそも 100 モジュール級の Aztec は 4px/モジュール未満で読めない
-   （同条件の QR は 1.5px/モジュールでも読める）ことがブラウザのサイズ掃引で分かった。
-   そこで 1 枚を 4 つの小さな Aztec（各 0.05 秒分・約 112 バイト・53 モジュール・誤り訂正 36%）に分ける。
-   小さいシンボルは外挿距離が短く、2.4px/モジュールから安定して読める（4 枚 × 17 サイズで確認）。
-   Aztec はクワイエットゾーンも四隅のマークも要らないので、シンボルの外側をシンボルと同じ格子・同じ濃さ・密度 50% の
-   ランダムドットで埋めると四角の境界が消える（カモフラージュ）。復号への影響は無い（カモ有無で結果が完全に一致）。
-   カモの乱数は枚ごとに変える：固定だとシンボル部分だけが毎枚ちらついて四角が見えてしまう。
-   シンボルは zxing-wasm の writer で作り、返ってくる SVG の矩形（M x y h w v h h-w Z）からモジュール行列を起こす */
-const AZTEC_WRITE = { format:'Aztec', ecLevel:'3', scale:1, withQuietZones:false };
-async function aztecMatrix(bytes){
-  const r = await ZXingWASM.writeBarcode(bytes, AZTEC_WRITE);
-  if (r.error || !r.svg) throw new Error(r.error || 'Aztec を生成できませんでした');
-  const n = +r.svg.match(/<svg width="(\d+)"/)[1];
-  const M = Array.from({ length: n }, () => new Uint8Array(n));
-  const re = /M(\d+) (\d+)h(\d+)v(\d+)h-?\d+Z/g; let m;
-  while ((m = re.exec(r.svg))){
-    const x = +m[1], y = +m[2], w = +m[3], h = +m[4];
-    for (let yy = y; yy < y + h; yy++) M[yy].fill(1, x, x + w);
-  }
-  return M;
-}
-/* QR: bytes は 1 パケット。Aztec: bytes は AZ_N 個のパケットの配列 */
 function drawCode(t, bytes){
   t.frameNo = (t.frameNo || 0) + 1;   /* カモフラージュの乱数の種。ダミーも含め描くたびに進める（本物の枚数 qrCount とは別） */
-  if (!isAztec()) return drawQR(t, bytes);
-  if (typeof ZXingWASM === 'undefined' || !ZXingWASM.writeBarcode){
-    $('#txErr').textContent = 'ZXing writer not loaded; Aztec unavailable. Switching to QR.';
-    $('#code').value = 'qr'; syncIcons('code'); applyLook(); return;
-  }
-  const pkts = Array.isArray(bytes) ? bytes : [bytes];
-  const seq = t.drawSeq = (t.drawSeq || 0) + 1;
-  Promise.all(pkts.map(aztecMatrix)).then(Ms => {
-    if (t.drawSeq !== seq || t.dead) return;   /* 生成中に次の枚が来ていたら捨てる */
-    $('#txErr').textContent = '';
-    drawAztec(t, Ms, pkts.reduce((a, b) => a + b.length, 0), seq);
-  }).catch(e => { $('#txErr').textContent = 'Does not fit in Aztec. Shorten the chunk.'; });
+  drawQR(t, bytes);
 }
-function drawAztec(t, Ms, nbytes, frame){
-  const n = Math.max(...Ms.map(M => M.length)), cells = 2 * n + AZ_GAP;
-  const record = $('#look').value === 'record', round = $('#dots').value === 'round', ink = INK, paper = PAPER;
-  const cv = $('#qr'), g = cv.getContext('2d');
-  /* 4 つを 2×2 に置く。シンボルの大きさが揃わない枚はそれぞれ枠の中央に */
-  const place = (o, scale) => Ms.map((M, q) => { const off = (n - M.length) / 2 * scale;
-    return { M, x: o + (q % 2) * (n + AZ_GAP) * scale + off, y: o + Math.floor(q / 2) * (n + AZ_GAP) * scale + off }; });
-  if (!record){
-    /* 白地・カモなし（読み取りの比較基準用） */
-    const q = 4, scale = Math.max(2, Math.floor(900 / (cells + q * 2))), S = (cells + q * 2) * scale;
-    if (cv.width !== S || cv.height !== S){ cv.width = cv.height = S; }
-    g.fillStyle = paper; g.fillRect(0, 0, S, S); g.fillStyle = ink;
-    for (const p of place(q * scale, scale)) aztecModules(g, p.M, p.x, p.y, scale, round);
-  } else {
-    const S = 1000, cx = S / 2, cy = S / 2;
-    if (cv.width !== S || cv.height !== S){ cv.width = cv.height = S; }
-    const labelR = Math.round(S * 0.468), block = Math.floor(labelR * 2 / Math.SQRT2) - 12;   /* 2×2 の対角がラベル円に収まる大きさ */
-    const scale = block / cells, o = cx - block / 2;
-    const key = [S, labelR].join('|');
-    if (t.discKey !== key){ drawDisc(S, labelR); t.discKey = key; }
-    g.clearRect(0, 0, S, S);
-    g.fillStyle = paper; g.beginPath(); g.arc(cx, cy, labelR, 0, Math.PI * 2); g.fill();
-    g.fillStyle = ink;
-    {
-      /* カモフラージュ：シンボルの枠の外を同じ格子でランダムに埋める。乱数は枚ごとに変える */
-      let seed = (frame * 2654435761) >>> 0 || 7; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
-      /* 占有判定は各シンボルの実寸で（小さいシンボルを枠の中央に置いた余りもカモで埋める） */
-      const occ = (gx, gy) => { for (let q = 0; q < AZ_N; q++){ const m = Ms[q].length, off = (n - m) / 2;
-        const bx = (q % 2) * (n + AZ_GAP) + off, by = Math.floor(q / 2) * (n + AZ_GAP) + off; if (gx >= bx && gx < bx + m && gy >= by && gy < by + m) return true; } return false; };
-      const ext = Math.ceil(labelR / scale) + 1, lim = (labelR - scale) * (labelR - scale);
-      for (let gy = -ext; gy <= cells + ext; gy++) for (let gx = -ext; gx <= cells + ext; gx++){
-        const x = o + gx * scale, y = o + gy * scale, dx = x + scale / 2 - cx, dy = y + scale / 2 - cy;
-        if (occ(gx, gy) || dx * dx + dy * dy > lim || rnd() >= 0.5) continue;
-        if (round){ g.beginPath(); g.arc(x + scale / 2, y + scale / 2, scale * 0.6, 0, Math.PI * 2); g.fill(); }
-        else g.fillRect(x, y, scale + 0.3, scale + 0.3);
-      }
-    }
-    for (const p of place(o, scale)) aztecModules(g, p.M, p.x, p.y, scale, round);
-  }
-  if (!t.stopping) $('#qr').classList.add('on');
-  $('#sVer').textContent = 'Aztec×' + Ms.length;
-  $('#sBytes').textContent = nbytes;
-  $('#sMod').textContent = n + '×' + n + '×' + Ms.length;
-}
-/* 盤の装飾層（Aztec のとき）：黒い盤・盤面の艶・溝。ラベル円の内側はシンボル層が描く。
+/* 盤の装飾層（Circle のとき）：黒い盤・盤面の艶・溝・白いラベル円。
    この層は CSS で実際の回転数で回り続けるので、回転の手がかり（艶の流れ）はここで作る */
 function drawDisc(S, labelR){
   const cv = $('#disc'), g = cv.getContext('2d'), cx = S / 2, cy = S / 2;
@@ -947,20 +833,6 @@ function drawDisc(S, labelR){
   g.strokeStyle = 'rgba(255,255,255,0.16)'; g.lineWidth = 2;
   for (const r of [labelR + 4, S / 2 - 8]){ g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke(); }
   g.fillStyle = PAPER; g.beginPath(); g.arc(cx, cy, labelR, 0, Math.PI * 2); g.fill();   /* 待機中に見える白い円 */
-}
-/* 中央 15×15（ブルズアイ・向きの印・モード情報）は QR のファインダーと同じく常に四角で描く。
-   丸ドットにすると環が点線になり検出が落ちる（ブラウザで確認） */
-function aztecModules(g, M, ox, oy, scale, round){
-  const n = M.length, rad = scale * 0.6, mid = (n - 1) / 2;
-  for (let r = 0; r < n; r++){ const row = M[r];
-    for (let c = 0; c < n; c++){
-      if (!row[c]) continue;
-      const x = ox + c * scale, y = oy + r * scale;
-      const core = Math.abs(r - mid) <= 7 && Math.abs(c - mid) <= 7;
-      if (round && !core){ g.beginPath(); g.arc(x + scale / 2, y + scale / 2, rad, 0, Math.PI * 2); g.fill(); }
-      else g.fillRect(x, y, scale + 0.3, scale + 0.3);  /* 倍率が小数のとき隣接モジュール間に筋が出ないよう僅かに重ねる */
-    }
-  }
 }
 function stopTx(){
   const t = tx_; tx_ = null;
@@ -1050,7 +922,7 @@ function updateGuide(){
   g.style.width = (vw / crop) + 'px'; g.style.height = (vh / crop) + 'px'; g.hidden = false;
 }
 $('#crop').onchange = updateGuide; window.addEventListener('resize', updateGuide);
-const ZX_OPTS = { formats:['QRCode','Aztec'], tryHarder:true, tryRotate:true, tryInvert:false, tryDownscale:true, maxNumberOfSymbols:8 };  /* v3.4: Aztec は 1 枚に 4 シンボル */
+const ZX_OPTS = { formats:['QRCode'], tryHarder:true, tryRotate:true, tryInvert:false, tryDownscale:true, maxNumberOfSymbols:1 };
 async function scan(r){
   const v = $('#video');
   if (v.readyState < 2 || !v.videoWidth) return;
