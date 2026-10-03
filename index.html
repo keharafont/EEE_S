@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>映すラジオ — Projected Radio v3.11</title>
+<title>映すラジオ — Projected Radio v3.12</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Noto+Serif:wght@400;700&display=swap" rel="stylesheet">
@@ -42,6 +42,13 @@ main{
 .bar{display:flex; align-items:baseline; gap:12px; border:1px solid var(--ink); padding:6px 10px 5px; margin-bottom:12px}
 #logo{font-family:"Zen Antique","Noto Serif JP",serif; font-weight:400; font-size:24px; letter-spacing:.06em; line-height:1}
 .bar .ver{font-weight:700; font-size:15px; font-family:"Noto Serif",serif; letter-spacing:.01em}
+#shareBtn{margin-left:auto; align-self:center; appearance:none; border:1px solid var(--ink); background:transparent; color:var(--ink); width:30px; height:30px; padding:0; display:flex; align-items:center; justify-content:center; border-radius:3px; cursor:pointer}
+#share{position:fixed; inset:0; z-index:60; background:rgba(11,13,16,.8); display:flex; align-items:center; justify-content:center; padding:20px}
+#share .card{background:var(--paper); color:var(--ink); border:2px solid var(--ink); border-radius:12px; padding:18px 18px 14px; max-width:360px; width:100%; text-align:center}
+#shareQR{display:flex; justify-content:center; margin-bottom:10px}
+#shareQR canvas{width:min(70vw,280px); height:auto; image-rendering:pixelated; background:#fff; border:8px solid #fff}
+#shareURL{font-size:13px; word-break:break-all; font-variant-numeric:tabular-nums}
+#share .hint{font-size:12px; color:var(--muted); margin-top:8px}
 #logo img, #logo svg{height:26px; width:auto; display:block}
 .lede{margin:0 0 14px; color:var(--muted); font-size:13px}
 .lede .v{float:right; font-variant-numeric:tabular-nums}
@@ -140,8 +147,20 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
 <body>
 <main>
   <!-- 左はロゴ（Zen Antique）、右は英語名 -->
-  <div class="bar"><span id="logo">映すラジオ</span><span class="ver">Projected Radio</span></div>
-  <p class="lede">Sound carried only by the light of a QR code on a screen. No network. <span class="v">v3.11</span></p>
+  <div class="bar"><span id="logo">映すラジオ</span><span class="ver">Projected Radio</span>
+    <button type="button" id="shareBtn" title="Open this page on a phone" aria-label="Show QR code of this page's address">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M3 3h8v8H3zm2 2v4h4V5zm8-2h8v8h-8zm2 2v4h4V5zM3 13h8v8H3zm2 2v4h4v-4zm8-2h3v3h-3zm5 0h3v3h-3zm-5 5h3v3h-3zm5 0h3v3h-3zm-2.5-2.5h3v3h-3z"/></svg>
+    </button>
+  </div>
+  <!-- このページのアドレスの QR（スマートフォンで開くため）。ヘッダー右端のボタンで表示 -->
+  <div id="share" hidden>
+    <div class="card">
+      <div id="shareQR"></div>
+      <div id="shareURL"></div>
+      <div class="hint">Scan to open this page on a phone. Tap anywhere to close.</div>
+    </div>
+  </div>
+  <p class="lede">Sound carried only by the light of a QR code on a screen. No network. <span class="v">v3.12</span></p>
 
   <div class="seg" role="group" aria-label="Mode">
     <button id="tabTx" aria-pressed="true">Transmit</button>
@@ -414,6 +433,20 @@ document.addEventListener('fullscreenchange', () => {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') for (const el of document.querySelectorAll('.stage.full')) toggleFull(el.id); });
 $('#txFull').onclick = () => toggleFull('txStage');
 $('#rxFull').onclick = () => toggleFull('rxStage');
+
+/* ---------- v3.12 ページ共有 QR ----------
+   このページのアドレス（クエリやハッシュは除く）を QR にして重ねて表示する。送信用の QR とは無関係。
+   qrcode-generator は既に読み込んでいるのでそれを使う */
+function showShare(){
+  const url = location.origin + location.pathname;
+  const q = qrcode(0, 'M'); q.addData(url); q.make();
+  const n = q.getModuleCount(), scale = 4, cv = document.createElement('canvas'); cv.width = cv.height = n * scale;
+  const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); g.fillStyle = '#000';
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) g.fillRect(c * scale, r * scale, scale, scale);
+  $('#shareQR').replaceChildren(cv); $('#shareURL').textContent = url; $('#share').hidden = false;
+}
+$('#shareBtn').onclick = showShare;
+$('#share').onclick = () => { $('#share').hidden = true; };
 
 /* ---------- tabs / look ---------- */
 function setTab(tx){
