@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>映すラジオ：QRで音を送る v3.7</title>
+<title>映すラジオ：QRで音を送る v3.8</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
@@ -145,36 +145,15 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
       </label>
       <label class="field">見た目
         <select id="look">
-          <option value="record" selected>レコード盤</option>
-          <option value="static">砂嵐（4:3）</option>
-          <option value="plain">コードのみ（白地・埋めなし）</option>
-        </select>
-      </label>
-      <label class="field">回転（コマ送り）
-        <select id="rpm">
-          <option value="0">止める</option>
-          <option value="16">16回転</option>
-          <option value="33" selected>33回転</option>
-          <option value="45">45回転</option>
+          <option value="record" selected>円</option>
+          <option value="static">4:3</option>
+          <option value="plain">コードのみ</option>
         </select>
       </label>
       <label class="field">ドット
         <select id="dots">
           <option value="round" selected>丸</option>
           <option value="square">四角</option>
-        </select>
-      </label>
-      <label class="field">色
-        <select id="tone">
-          <option value="sepia" selected>セピア</option>
-          <option value="mono">黒白</option>
-        </select>
-      </label>
-      <label class="field">盤面の埋め
-        <select id="fill">
-          <option value="camo" selected>同じ濃さのドットで埋めて円に（カモフラージュ）</option>
-          <option value="dots">薄いドット（v3 旧方式）</option>
-          <option value="none">なし（四角のまま）</option>
         </select>
       </label>
     </div>
@@ -328,7 +307,10 @@ const AZ_N = 4;    /* 1 枚あたりのシンボル数（2×2） */
 const AZ_GAP = 2;  /* シンボル間の隙間（モジュール） */
 const isAztec = () => $('#code').value === 'aztec';
 /* 装飾を別層（#disc）で連続回転させ、シンボル層を静止させる描き方。Aztec、または QR のカモフラージュ */
-const isCamo = () => $('#look').value === 'record' && (isAztec() || $('#fill').value === 'camo');
+const isCamo = () => $('#look').value === 'record';
+/* v3.8: 回転・色・盤面の埋めの選択は撤去し、回転なし・黒白・カモフラージュに固定（本人指示 2026-10-03）。
+   旧方式（CSS コマ送り回転、セピア、薄いドット）のコードは残してあるが、これらの定数で到達しない */
+const RPM = 0, SEPIA = false, FILL = 'camo';
 function applyPreset(i){
   const p = PRESETS[i];
   $('#rate').value = p.rate; $('#chunk').value = String(isAztec() ? p.az : p.chunk); $('#red').value = isAztec() ? 1 : p.red; $('#ec').value = p.ec; $('#buf').value = p.buf.toFixed(1);
@@ -399,7 +381,7 @@ if (!hasWC){
 }
 let spinAngle = 0;
 function applyLook(){
-  const cv = $('#qr'), rpm = +$('#rpm').value, look = $('#look').value, record = look === 'record';
+  const cv = $('#qr'), rpm = RPM, look = $('#look').value, record = look === 'record';
   cv.classList.toggle('plain', look === 'plain');
   $('#wrap').classList.toggle('wide', look === 'static');
   if (!record || rpm === 0){ spinAngle = 0; }
@@ -417,12 +399,12 @@ function applyLook(){
    33rpm×0.24秒 ≒ 47.5°/枚 で最悪の角度を踏むので、シンボルは回さず、盤の装飾レイヤー（#disc）だけを CSS で連続回転させる。
    中身は毎枚変わるのでシンボルが回って見えることはなく、回転の手がかりは装飾側で作る */
 function stepSpin(t){
-  const cv = $('#qr'), rpm = +$('#rpm').value, record = $('#look').value === 'record';
+  const cv = $('#qr'), rpm = RPM, record = $('#look').value === 'record';
   if (!record || rpm === 0 || isCamo()) return;
   spinAngle = (spinAngle + 360 * t.cfg.chunk * rpm / 60) % 360;
   cv.style.transform = 'rotate(' + spinAngle.toFixed(2) + 'deg)';
 }
-for (const id of ['look','rpm','dots','tone','fill']) $('#' + id).onchange = () => { applyLook(); if (tx_ && tx_.lastPkt) drawCode(tx_, tx_.lastPkt); };
+for (const id of ['look','dots']) $('#' + id).onchange = () => { applyLook(); if (tx_ && tx_.lastPkt) drawCode(tx_, tx_.lastPkt); };
 applyLook();
 
 /* ---------- IMA ADPCM ---------- */
@@ -641,7 +623,7 @@ function drawQR(t, bytes){
   try { qr = makeQR(t, s); }
   catch (e){ $('#txErr').textContent = 'QRに収まりませんでした。ダイヤルを下げるか冗長度を減らしてください。'; return; }
   const m = qr.getModuleCount(), q = 4, cells = m + q * 2;
-  const record = $('#look').value === 'record', round = $('#dots').value === 'round', sepia = $('#tone').value === 'sepia';
+  const record = $('#look').value === 'record', round = $('#dots').value === 'round', sepia = SEPIA;
   const ink = sepia ? '#2b1a0c' : '#000', paper = sepia ? '#f1e6cd' : '#fff';
   const cv = $('#qr'), g = cv.getContext('2d');
 
@@ -652,7 +634,7 @@ function drawQR(t, bytes){
     if (cv.width !== W || cv.height !== H){ cv.width = W; cv.height = H; }
     g.fillStyle = paper; g.fillRect(0, 0, W, H);
     const scale = Math.floor(H * 0.86) / m;
-    if ($('#fill').value === 'none'){ g.fillStyle = ink; drawModules(g, qr, m, cx - m * scale / 2, cy - m * scale / 2, scale, round); }
+    if (FILL === 'none'){ g.fillStyle = ink; drawModules(g, qr, m, cx - m * scale / 2, cy - m * scale / 2, scale, round); }
     else drawQRCamo(g, qr, m, cx, cy, scale, 0, ink, round, t.qrCount || 0, [0, 0, W, H]);
   } else if (!record){
     const scale = Math.max(2, Math.floor(900 / cells));
@@ -684,7 +666,7 @@ function drawQR(t, bytes){
     for (const r of [labelR + 4, S / 2 - 8]){ g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke(); }
     g.fillStyle = paper; g.beginPath(); g.arc(cx, cy, labelR, 0, Math.PI * 2); g.fill();
     const ox = cx - qrSide / 2, oy = cy - qrSide / 2;
-    if ($('#fill').value === 'dots') drawFiller(g, ink, ox, oy, cells, scale, cx, cy, labelR, round);
+    if (FILL === 'dots') drawFiller(g, ink, ox, oy, cells, scale, cx, cy, labelR, round);
     g.fillStyle = ink;
     drawModules(g, qr, m, ox + q * scale, oy + q * scale, scale, round);
   }
@@ -789,7 +771,7 @@ function drawCode(t, bytes){
 }
 function drawAztec(t, Ms, nbytes, frame){
   const n = Math.max(...Ms.map(M => M.length)), cells = 2 * n + AZ_GAP;
-  const record = $('#look').value === 'record', round = $('#dots').value === 'round', sepia = $('#tone').value === 'sepia';
+  const record = $('#look').value === 'record', round = $('#dots').value === 'round', sepia = SEPIA;
   const ink = sepia ? '#2b1a0c' : '#000', paper = sepia ? '#f1e6cd' : '#fff';
   const cv = $('#qr'), g = cv.getContext('2d');
   /* 4 つを 2×2 に置く。シンボルの大きさが揃わない枚はそれぞれ枠の中央に */
@@ -811,7 +793,7 @@ function drawAztec(t, Ms, nbytes, frame){
     g.clearRect(0, 0, S, S);
     g.fillStyle = paper; g.beginPath(); g.arc(cx, cy, labelR, 0, Math.PI * 2); g.fill();
     g.fillStyle = ink;
-    if ($('#fill').value !== 'none'){
+    if (FILL !== 'none'){
       /* カモフラージュ：シンボルの枠の外を同じ格子でランダムに埋める。乱数は枚ごとに変える */
       let seed = (frame * 2654435761) >>> 0 || 7; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
       /* 占有判定は各シンボルの実寸で（小さいシンボルを枠の中央に置いた余りもカモで埋める） */
