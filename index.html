@@ -734,7 +734,7 @@ function drawQR(t, bytes){
     if (cv.width !== W || cv.height !== H){ cv.width = W; cv.height = H; }
     g.fillStyle = paper; g.fillRect(0, 0, W, H);
     const scale = Math.floor(H * 0.86) / m;
-    drawQRCamo(g, qr, m, cx, cy, scale, 0, ink, round, t.qrCount || 0, [0, 0, W, H]);
+    drawQRCamo(g, qr, m, cx, cy, scale, 0, ink, round, t.frameNo, [0, 0, W, H]);
   } else if (look === 'plain'){
     const scale = Math.max(2, Math.floor(900 / cells));
     if (cv.width !== cells * scale || cv.height !== cells * scale){ cv.width = cv.height = cells * scale; }
@@ -750,7 +750,7 @@ function drawQR(t, bytes){
     if (t.discKey !== key){ drawDisc(S, labelR); t.discKey = key; }
     g.clearRect(0, 0, S, S);
     g.fillStyle = paper; g.beginPath(); g.arc(cx, cy, labelR, 0, Math.PI * 2); g.fill();
-    drawQRCamo(g, qr, m, cx, cy, block / m, labelR, ink, round, t.qrCount || 0);
+    drawQRCamo(g, qr, m, cx, cy, block / m, labelR, ink, round, t.frameNo);
   }
   if (!t.stopping) $('#qr').classList.add('on');
   $('#sVer').textContent = (m - 17) / 4;
@@ -822,6 +822,7 @@ async function aztecMatrix(bytes){
 }
 /* QR: bytes は 1 パケット。Aztec: bytes は AZ_N 個のパケットの配列 */
 function drawCode(t, bytes){
+  t.frameNo = (t.frameNo || 0) + 1;   /* カモフラージュの乱数の種。ダミーも含め描くたびに進める（本物の枚数 qrCount とは別） */
   if (!isAztec()) return drawQR(t, bytes);
   if (typeof ZXingWASM === 'undefined' || !ZXingWASM.writeBarcode){
     $('#txErr').textContent = 'ZXing writer not loaded; Aztec unavailable. Switching to QR.';
