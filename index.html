@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>映すラジオ：QRで音を送る v3.3</title>
+<title>映すラジオ：QRで音を送る v3.4</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
@@ -127,14 +127,14 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
     <div class="row">
       <label class="field">コード
         <select id="code">
-          <option value="aztec" selected>Aztec（真円に切り抜き）</option>
+          <option value="aztec" selected>Aztec 2×2（円にカモフラージュ）</option>
           <option value="qr">QR（四角）</option>
         </select>
       </label>
       <label class="field">見た目
         <select id="look">
           <option value="record" selected>レコード盤</option>
-          <option value="plain">コードのみ（白地・切り抜きなし）</option>
+          <option value="plain">コードのみ（白地・埋めなし）</option>
         </select>
       </label>
       <label class="field">回転（コマ送り）
@@ -159,7 +159,7 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
       </label>
       <label class="field">盤面の埋め
         <select id="fill">
-          <option value="dots" selected>薄いドットで円に</option>
+          <option value="dots" selected>ドットで埋めて円に</option>
           <option value="none">なし（四角のまま）</option>
         </select>
       </label>
@@ -178,6 +178,10 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
         </label>
         <label class="field">チャンク長
           <select id="chunk">
+            <option value="0.025">0.025 秒（Aztec用）</option>
+            <option value="0.03">0.03 秒（Aztec用）</option>
+            <option value="0.05">0.05 秒（Aztec用）</option>
+            <option value="0.06">0.06 秒（Aztec用）</option>
             <option value="0.24">0.24 秒</option>
             <option value="0.32">0.32 秒</option>
             <option value="0.48">0.48 秒</option>
@@ -288,19 +292,24 @@ const hasWC = typeof AudioEncoder !== 'undefined' && typeof AudioDecoder !== 'un
 if (typeof ZXingWASM !== 'undefined'){ try { ZXingWASM.prepareZXingModule({ fireImmediately:true }); } catch {} }
 
 /* ---------- presets ---------- */
+/* az: Aztec のときの 1 シンボルあたりのチャンク長。1 枚は AZ_N 個のシンボル。
+   1 シンボル ≈ 112 バイト（rate×chunk ≤ 200 サンプル）に収める。下の AZTEC_MAX 参照 */
 const PRESETS = [
-  { name:'蝋管',    rate:3000, chunk:0.32, red:2, ec:'L', buf:1.5 },
-  { name:'電話',    rate:4000, chunk:0.24, red:2, ec:'L', buf:2.0 },
-  { name:'短波',    rate:6000, chunk:0.24, red:2, ec:'L', buf:3.0 },
-  { name:'AMラジオ', rate:8000, chunk:0.24, red:2, ec:'L', buf:4.0 },
+  { name:'蝋管',    rate:3000, chunk:0.32, az:0.06,  red:2, ec:'L', buf:1.5 },
+  { name:'電話',    rate:4000, chunk:0.24, az:0.05,  red:2, ec:'L', buf:2.0 },
+  { name:'短波',    rate:6000, chunk:0.24, az:0.03,  red:2, ec:'L', buf:3.0 },
+  { name:'AMラジオ', rate:8000, chunk:0.24, az:0.025, red:2, ec:'L', buf:4.0 },
 ];
-/* v3.3 Aztec（誤り訂正50%）は1枚 829 バイトが上限。真円に切り抜いた分（面積の21.5%）を誤り訂正で埋めるため、
-   これより低い誤り訂正では復号できない（Node 上の ZXing で測定済み）。プリセットの冗長2倍（979バイト）は入らないので 1 倍にする */
-const AZTEC_MAX = 829;
+/* v3.4 Aztec は 1 枚を 4 つの小さなシンボルに分ける（drawAztec のコメント参照）。
+   1 シンボル 112 バイト（53 モジュール・誤り訂正 36%）までは 2.4px/モジュールから安定して読めることを確認。
+   大きくするほど ZXing の Aztec 検出（ブルズアイからの外挿）が弱くなるので、これを実用上限とする。冗長 1 倍 */
+const AZTEC_MAX = 112;
+const AZ_N = 4;    /* 1 枚あたりのシンボル数（2×2） */
+const AZ_GAP = 2;  /* シンボル間の隙間（モジュール） */
 const isAztec = () => $('#code').value === 'aztec';
 function applyPreset(i){
   const p = PRESETS[i];
-  $('#rate').value = p.rate; $('#chunk').value = p.chunk; $('#red').value = isAztec() ? 1 : p.red; $('#ec').value = p.ec; $('#buf').value = p.buf.toFixed(1);
+  $('#rate').value = p.rate; $('#chunk').value = String(isAztec() ? p.az : p.chunk); $('#red').value = isAztec() ? 1 : p.red; $('#ec').value = p.ec; $('#buf').value = p.buf.toFixed(1);
   $('#dialName').textContent = p.name;
   describe();
 }
@@ -315,8 +324,9 @@ function packetBytes(c, codec){
 }
 function describe(){
   const c = readCfg(), codec = $('#codec').value, bytes = packetBytes(c, codec);
-  let s = `${codec === 'adpcm' ? c.rate / 1000 + ' kHz ADPCM' : codec.replace('opus','Opus ') + 'kbps'}　約${bytes}バイト／枚　${(1 / c.chunk).toFixed(1)}枚／秒　冗長${c.red}倍　遅延${c.buf.toFixed(1)}秒`;
-  if (isAztec() && bytes > AZTEC_MAX) s += `　⚠ Aztec の上限 ${AZTEC_MAX} バイトを超えています（冗長度を1倍に、またはレートを下げる）`;
+  const az = isAztec(), per = az ? `約${bytes}バイト×${AZ_N}／枚　${(1 / (c.chunk * AZ_N)).toFixed(1)}枚／秒` : `約${bytes}バイト／枚　${(1 / c.chunk).toFixed(1)}枚／秒`;
+  let s = `${codec === 'adpcm' ? c.rate / 1000 + ' kHz ADPCM' : codec.replace('opus','Opus ') + 'kbps'}　${per}　冗長${c.red}倍　遅延${c.buf.toFixed(1)}秒`;
+  if (az && bytes > AZTEC_MAX) s += `　⚠ Aztec の 1 シンボル上限 ${AZTEC_MAX} バイトを超えています（チャンク長を短く・冗長度1倍）`;
   $('#dialDesc').textContent = s;
 }
 $('#dial').oninput = () => applyPreset(+$('#dial').value);
@@ -489,8 +499,13 @@ async function startTx(){
     const cur = { seq: t.seq & 0xffff, data }; t.seq++;
     t.hist.unshift(cur); if (t.hist.length > cfg.red) t.hist.length = cfg.red;
     const pkt = buildPacket(codec, rateForHeader, cfg.buf, t.hist);
-    t.lastPkt = pkt;
-    stepSpin(t); drawCode(t, pkt); t.qrCount++;
+    if (isAztec()){
+      /* Aztec は AZ_N パケット（＝AZ_N チャンク）を 1 枚にまとめて表示する */
+      t.pend = t.pend || []; t.pend.push(pkt);
+      if (t.pend.length < AZ_N) return;
+      t.lastPkt = t.pend; t.pend = [];
+    } else t.lastPkt = pkt;
+    stepSpin(t); drawCode(t, t.lastPkt); t.qrCount++;
   };
 
   if (codec === CODEC_OPUS){
@@ -620,13 +635,18 @@ function drawModules(g, qr, m, ox, oy, scale, round){
   }
 }
 
-/* ---------- v3.3 Aztec（真円） ----------
-   QR は四隅のファインダーが必須だが、Aztec は中央のブルズアイだけで位置・向き・大きさを決めるので四隅はデータだけ。
-   誤り訂正を 50%（zint の level 4）にして内接円で切り抜くと、失う面積 21.5% を誤り訂正が吸収して復号できる
-   （Node 上の zxing-wasm 2.2.4 で、縮小 2〜6px/モジュール × ぼかし × 回転で、切り抜きなしと同じ成功率を確認）。
-   半径は辺のちょうど 1/2。0.48 では落ちるので余裕は無く、これ以上は削らない。
+/* ---------- v3.4 Aztec 2×2 ＋ カモフラージュ ----------
+   経緯：
+   v3.3 で「大きな Aztec を内接円で切り抜く」を試したが、ZXing の Aztec 検出は中央ブルズアイから外周を外挿するため
+   (1) 切り抜きで誤り訂正の余裕を使い切ると画素の位相だけで落ちる、(2) そもそも 100 モジュール級の Aztec は 4px/モジュール未満で読めない
+   （同条件の QR は 1.5px/モジュールでも読める）ことがブラウザのサイズ掃引で分かった。
+   そこで 1 枚を 4 つの小さな Aztec（各 0.05 秒分・約 112 バイト・53 モジュール・誤り訂正 36%）に分ける。
+   小さいシンボルは外挿距離が短く、2.4px/モジュールから安定して読める（4 枚 × 17 サイズで確認）。
+   Aztec はクワイエットゾーンも四隅のマークも要らないので、シンボルの外側をシンボルと同じ格子・同じ濃さ・密度 50% の
+   ランダムドットで埋めると四角の境界が消える（カモフラージュ）。復号への影響は無い（カモ有無で結果が完全に一致）。
+   カモの乱数は枚ごとに変える：固定だとシンボル部分だけが毎枚ちらついて四角が見えてしまう。
    シンボルは zxing-wasm の writer で作り、返ってくる SVG の矩形（M x y h w v h h-w Z）からモジュール行列を起こす */
-const AZTEC_WRITE = { format:'Aztec', ecLevel:'4', scale:1, withQuietZones:false };
+const AZTEC_WRITE = { format:'Aztec', ecLevel:'3', scale:1, withQuietZones:false };
 async function aztecMatrix(bytes){
   const r = await ZXingWASM.writeBarcode(bytes, AZTEC_WRITE);
   if (r.error || !r.svg) throw new Error(r.error || 'Aztec を生成できませんでした');
@@ -639,61 +659,74 @@ async function aztecMatrix(bytes){
   }
   return M;
 }
+/* QR: bytes は 1 パケット。Aztec: bytes は AZ_N 個のパケットの配列 */
 function drawCode(t, bytes){
   if (!isAztec()) return drawQR(t, bytes);
   if (typeof ZXingWASM === 'undefined' || !ZXingWASM.writeBarcode){
     $('#txErr').textContent = 'ZXing（writer）を読み込めていないので Aztec は使えません。QR に切り替えます。';
-    $('#code').value = 'qr'; applyLook(); return drawQR(t, bytes);
+    $('#code').value = 'qr'; applyLook(); return;
   }
+  const pkts = Array.isArray(bytes) ? bytes : [bytes];
   const seq = t.drawSeq = (t.drawSeq || 0) + 1;
-  aztecMatrix(bytes).then(M => {
+  Promise.all(pkts.map(aztecMatrix)).then(Ms => {
     if (t.drawSeq !== seq || tx_ !== t) return;   /* 生成中に次の枚が来ていたら捨てる */
     $('#txErr').textContent = '';
-    drawAztec(t, M, bytes.length);
-  }).catch(e => { $('#txErr').textContent = 'Aztec に収まりませんでした（上限 ' + AZTEC_MAX + ' バイト）。冗長度を1倍にするかレートを下げてください。'; });
+    drawAztec(t, Ms, pkts.reduce((a, b) => a + b.length, 0), seq);
+  }).catch(e => { $('#txErr').textContent = 'Aztec に収まりませんでした。チャンク長を短くしてください。'; });
 }
-function drawAztec(t, M, nbytes){
-  const n = M.length;
+function drawAztec(t, Ms, nbytes, frame){
+  const n = Math.max(...Ms.map(M => M.length)), cells = 2 * n + AZ_GAP;
   const record = $('#look').value === 'record', round = $('#dots').value === 'round', sepia = $('#tone').value === 'sepia';
   const ink = sepia ? '#2b1a0c' : '#000', paper = sepia ? '#f1e6cd' : '#fff';
   const cv = $('#qr'), g = cv.getContext('2d');
+  /* 4 つを 2×2 に置く。シンボルの大きさが揃わない枚はそれぞれ枠の中央に */
+  const place = (o, scale) => Ms.map((M, q) => { const off = (n - M.length) / 2 * scale;
+    return { M, x: o + (q % 2) * (n + AZ_GAP) * scale + off, y: o + Math.floor(q / 2) * (n + AZ_GAP) * scale + off }; });
   if (!record){
-    /* 白地・切り抜きなし（読み取りの比較基準用） */
-    const q = 4, scale = Math.max(2, Math.floor(900 / (n + q * 2))), S = (n + q * 2) * scale;
+    /* 白地・カモなし（読み取りの比較基準用） */
+    const q = 4, scale = Math.max(2, Math.floor(900 / (cells + q * 2))), S = (cells + q * 2) * scale;
     if (cv.width !== S){ cv.width = cv.height = S; }
-    g.fillStyle = paper; g.fillRect(0, 0, S, S);
-    g.fillStyle = ink; aztecModules(g, M, q * scale, q * scale, scale, round);
+    g.fillStyle = paper; g.fillRect(0, 0, S, S); g.fillStyle = ink;
+    for (const p of place(q * scale, scale)) aztecModules(g, p.M, p.x, p.y, scale, round);
   } else {
-    const S = 1000;
+    const S = 1000, cx = S / 2, cy = S / 2;
     if (cv.width !== S){ cv.width = cv.height = S; }
-    const cx = S / 2, cy = S / 2;
-    const scale = Math.max(2, Math.floor(Math.floor(S / 1.4) / n)), side = n * scale, R = side / 2;
-    const labelR = Math.min(S / 2 - 14, R + 60);
-    /* 盤の装飾は別 canvas（#disc）。幾何や見た目が変わったときだけ描き直す。回転は CSS（applyLook） */
-    const key = [S, R, scale, labelR, round, sepia, $('#fill').value].join('|');
-    if (t.discKey !== key){ drawDisc(S, R, scale, labelR, ink, paper, round); t.discKey = key; }
-    /* シンボル層：円の外は透明。シンボルは回さない */
+    const labelR = Math.round(S * 0.468), block = Math.floor(labelR * 2 / Math.SQRT2) - 12;   /* 2×2 の対角がラベル円に収まる大きさ */
+    const scale = block / cells, o = cx - block / 2;
+    const key = [S, labelR, sepia].join('|');
+    if (t.discKey !== key){ drawDisc(S, labelR); t.discKey = key; }
     g.clearRect(0, 0, S, S);
-    g.save(); g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.clip();
-    g.fillStyle = paper; g.fillRect(cx - R, cy - R, side, side);
-    g.fillStyle = ink; aztecModules(g, M, cx - side / 2, cy - side / 2, scale, round);
-    g.restore();
+    g.fillStyle = paper; g.beginPath(); g.arc(cx, cy, labelR, 0, Math.PI * 2); g.fill();
+    g.fillStyle = ink;
+    if ($('#fill').value === 'dots'){
+      /* カモフラージュ：シンボルの枠の外を同じ格子でランダムに埋める。乱数は枚ごとに変える */
+      let seed = (frame * 2654435761) >>> 0 || 7; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+      /* 占有判定は各シンボルの実寸で（小さいシンボルを枠の中央に置いた余りもカモで埋める） */
+      const occ = (gx, gy) => { for (let q = 0; q < AZ_N; q++){ const m = Ms[q].length, off = (n - m) / 2;
+        const bx = (q % 2) * (n + AZ_GAP) + off, by = Math.floor(q / 2) * (n + AZ_GAP) + off; if (gx >= bx && gx < bx + m && gy >= by && gy < by + m) return true; } return false; };
+      const ext = Math.ceil(labelR / scale) + 1, lim = (labelR - scale) * (labelR - scale);
+      for (let gy = -ext; gy <= cells + ext; gy++) for (let gx = -ext; gx <= cells + ext; gx++){
+        const x = o + gx * scale, y = o + gy * scale, dx = x + scale / 2 - cx, dy = y + scale / 2 - cy;
+        if (occ(gx, gy) || dx * dx + dy * dy > lim || rnd() >= 0.5) continue;
+        if (round){ g.beginPath(); g.arc(x + scale / 2, y + scale / 2, scale * 0.6, 0, Math.PI * 2); g.fill(); }
+        else g.fillRect(x, y, scale + 0.3, scale + 0.3);
+      }
+    }
+    for (const p of place(o, scale)) aztecModules(g, p.M, p.x, p.y, scale, round);
   }
   $('#wrap').hidden = false; $('#txIdle').hidden = true;
-  $('#sVer').textContent = 'Aztec';
+  $('#sVer').textContent = 'Aztec×' + Ms.length;
   $('#sBytes').textContent = nbytes;
-  $('#sMod').textContent = n + '×' + n;
+  $('#sMod').textContent = n + '×' + n + '×' + Ms.length;
 }
-/* 盤の装飾層（Aztec のとき）。黒い盤・溝・盤面の艶・ラベル円・埋めドットの環。
-   この層は CSS で実際の回転数で回り続けるので、回転の手がかり（動く模様）はここで作る。
-   埋めドットはシンボルの縁 +1 モジュールの外側から始めて、復号に影響しない */
-function drawDisc(S, R, scale, labelR, ink, paper, round){
+/* 盤の装飾層（Aztec のとき）：黒い盤・盤面の艶・溝。ラベル円の内側はシンボル層が描く。
+   この層は CSS で実際の回転数で回り続けるので、回転の手がかり（艶の流れ）はここで作る */
+function drawDisc(S, labelR){
   const cv = $('#disc'), g = cv.getContext('2d'), cx = S / 2, cy = S / 2;
   if (cv.width !== S){ cv.width = cv.height = S; }
   g.clearRect(0, 0, S, S);
   g.fillStyle = '#0e0b09'; g.beginPath(); g.arc(cx, cy, S / 2 - 2, 0, Math.PI * 2); g.fill();
-  /* 艶：盤面に差す光の反射（向かい合う2方向にうっすら）。回ると光が流れて見える */
-  if (g.createConicGradient){ /* 古い Safari には無い。無ければ艶なし */
+  if (g.createConicGradient){ /* 艶：盤面に差す光の反射（向かい合う2方向にうっすら）。古い Safari には無い */
     const sheen = g.createConicGradient(0, cx, cy);
     for (let i = 0; i <= 8; i++) sheen.addColorStop(i / 8, (i % 4 === 1) ? 'rgba(255,255,255,0.045)' : 'rgba(255,255,255,0)');
     g.fillStyle = sheen; g.beginPath(); g.arc(cx, cy, S / 2 - 2, 0, Math.PI * 2); g.fill();
@@ -702,27 +735,18 @@ function drawDisc(S, R, scale, labelR, ink, paper, round){
   for (let r = labelR + 10; r < S / 2 - 12; r += 5){ g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke(); }
   g.strokeStyle = 'rgba(255,255,255,0.16)'; g.lineWidth = 2;
   for (const r of [labelR + 4, S / 2 - 8]){ g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke(); }
-  g.fillStyle = paper; g.beginPath(); g.arc(cx, cy, labelR, 0, Math.PI * 2); g.fill();
-  if ($('#fill').value !== 'dots') return;
-  let seed = 7; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
-  const inner = (R + scale) * (R + scale), outer = (labelR - scale) * (labelR - scale), ext = Math.ceil(labelR / scale) + 1;
-  g.save(); g.translate(cx, cy); g.fillStyle = ink; g.globalAlpha = 0.3;
-  for (let r = -ext; r <= ext; r++) for (let c = -ext; c <= ext; c++){
-    const x = c * scale + scale / 2, y = r * scale + scale / 2, d2 = x * x + y * y;
-    if (d2 < inner || d2 > outer || rnd() >= 0.5) continue;
-    if (round){ g.beginPath(); g.arc(x, y, scale * 0.6, 0, Math.PI * 2); g.fill(); }
-    else g.fillRect(x - scale / 2, y - scale / 2, scale, scale);
-  }
-  g.restore();
 }
+/* 中央 15×15（ブルズアイ・向きの印・モード情報）は QR のファインダーと同じく常に四角で描く。
+   丸ドットにすると環が点線になり検出が落ちる（ブラウザで確認） */
 function aztecModules(g, M, ox, oy, scale, round){
-  const n = M.length, rad = scale * 0.6;
+  const n = M.length, rad = scale * 0.6, mid = (n - 1) / 2;
   for (let r = 0; r < n; r++){ const row = M[r];
     for (let c = 0; c < n; c++){
       if (!row[c]) continue;
       const x = ox + c * scale, y = oy + r * scale;
-      if (round){ g.beginPath(); g.arc(x + scale / 2, y + scale / 2, rad, 0, Math.PI * 2); g.fill(); }
-      else g.fillRect(x, y, scale, scale);
+      const core = Math.abs(r - mid) <= 7 && Math.abs(c - mid) <= 7;
+      if (round && !core){ g.beginPath(); g.arc(x + scale / 2, y + scale / 2, rad, 0, Math.PI * 2); g.fill(); }
+      else g.fillRect(x, y, scale + 0.3, scale + 0.3);  /* 倍率が小数のとき隣接モジュール間に筋が出ないよう僅かに重ねる */
     }
   }
 }
@@ -809,7 +833,7 @@ function updateGuide(){
   g.style.width = (vw / crop) + 'px'; g.style.height = (vh / crop) + 'px'; g.hidden = false;
 }
 $('#crop').onchange = updateGuide; window.addEventListener('resize', updateGuide);
-const ZX_OPTS = { formats:['QRCode','Aztec'], tryHarder:true, tryRotate:true, tryInvert:false, tryDownscale:true, maxNumberOfSymbols:1 };
+const ZX_OPTS = { formats:['QRCode','Aztec'], tryHarder:true, tryRotate:true, tryInvert:false, tryDownscale:true, maxNumberOfSymbols:8 };  /* v3.4: Aztec は 1 枚に 4 シンボル */
 async function scan(r){
   const v = $('#video');
   if (v.readyState < 2 || !v.videoWidth) return;
@@ -825,18 +849,17 @@ async function scan(r){
   r.scans.push(performance.now());
   r.camInfo = v.videoWidth + '×' + v.videoHeight + (crop > 1 ? ' 中央1/' + crop : '') + ' → ' + w + '×' + h;
   const useZx = r.zx && $('#decoder').value === 'zxing', t0 = performance.now();
-  let bytes = null;
+  const found = [];
   if (useZx){
     const rr = await ZXingWASM.readBarcodes(img, ZX_OPTS);
-    const hit = rr.find(x => x.isValid && x.bytes && x.bytes.length);
-    if (hit) bytes = hit.bytes;
+    for (const x of rr) if (x.isValid && x.bytes && x.bytes.length) found.push(x.bytes);
   } else {
     const res = jsQR(img.data, w, h, { inversionAttempts:'dontInvert' });
-    if (res && res.binaryData && res.binaryData.length) bytes = Uint8Array.from(res.binaryData);
+    if (res && res.binaryData && res.binaryData.length) found.push(Uint8Array.from(res.binaryData));
   }
   r.decMs = r.decMs == null ? performance.now() - t0 : r.decMs * 0.9 + (performance.now() - t0) * 0.1;
   r.decName = useZx ? 'ZXing' : 'jsQR';
-  if (bytes) onPacket(r, bytes);
+  for (const bytes of found) onPacket(r, bytes);
 }
 function chunkSecOf(p, c){
   if (p.codec === CODEC_ADPCM) return ((c.data.length - 3) * 2) / p.rate;
