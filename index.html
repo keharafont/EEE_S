@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>映すラジオ：QRで音を送る v3.4</title>
+<title>映すラジオ：QRで音を送る v3.5</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
@@ -127,8 +127,8 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
     <div class="row">
       <label class="field">コード
         <select id="code">
-          <option value="aztec" selected>Aztec 2×2（円にカモフラージュ）</option>
-          <option value="qr">QR（四角）</option>
+          <option value="qr" selected>QR</option>
+          <option value="aztec">Aztec 2×2（実験用・実機で欠損大）</option>
         </select>
       </label>
       <label class="field">見た目
@@ -159,7 +159,8 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
       </label>
       <label class="field">盤面の埋め
         <select id="fill">
-          <option value="dots" selected>ドットで埋めて円に</option>
+          <option value="camo" selected>同じ濃さのドットで埋めて円に（カモフラージュ）</option>
+          <option value="dots">薄いドット（v3 旧方式）</option>
           <option value="none">なし（四角のまま）</option>
         </select>
       </label>
@@ -307,6 +308,8 @@ const AZTEC_MAX = 112;
 const AZ_N = 4;    /* 1 枚あたりのシンボル数（2×2） */
 const AZ_GAP = 2;  /* シンボル間の隙間（モジュール） */
 const isAztec = () => $('#code').value === 'aztec';
+/* 装飾を別層（#disc）で連続回転させ、シンボル層を静止させる描き方。Aztec、または QR のカモフラージュ */
+const isCamo = () => $('#look').value === 'record' && (isAztec() || $('#fill').value === 'camo');
 function applyPreset(i){
   const p = PRESETS[i];
   $('#rate').value = p.rate; $('#chunk').value = String(isAztec() ? p.az : p.chunk); $('#red').value = isAztec() ? 1 : p.red; $('#ec').value = p.ec; $('#buf').value = p.buf.toFixed(1);
@@ -356,12 +359,12 @@ function applyLook(){
   const cv = $('#qr'), rpm = +$('#rpm').value, record = $('#look').value === 'record';
   cv.classList.toggle('plain', !record);
   if (!record || rpm === 0){ spinAngle = 0; }
-  /* Aztec はシンボルを回さない（下記）ので CSS の回転は使わない */
-  if (!record || rpm === 0 || isAztec()) cv.style.transform = '';
+  /* 層分離（Aztec／QR カモ）のときはシンボルを回さないので CSS の回転は使わない */
+  if (!record || rpm === 0 || isCamo()) cv.style.transform = '';
   $('#txStage').classList.toggle('vinyl', record);
-  /* Aztec のとき盤の装飾レイヤーを実際の回転数で連続回転させる。シンボルではないので動きブレは構わない */
-  const disc = $('#disc'), spin = isAztec() && record && rpm > 0;
-  disc.hidden = !(isAztec() && record);
+  /* 層分離のとき盤の装飾レイヤーを実際の回転数で連続回転させる。シンボルではないので動きブレは構わない */
+  const disc = $('#disc'), spin = isCamo() && rpm > 0;
+  disc.hidden = !isCamo();
   disc.classList.toggle('spin', spin);
   if (spin) disc.style.setProperty('--spin', (60 / rpm).toFixed(3) + 's');
 }
@@ -371,7 +374,7 @@ function applyLook(){
    中身は毎枚変わるのでシンボルが回って見えることはなく、回転の手がかりは装飾側で作る */
 function stepSpin(t){
   const cv = $('#qr'), rpm = +$('#rpm').value, record = $('#look').value === 'record';
-  if (!record || rpm === 0 || isAztec()) return;
+  if (!record || rpm === 0 || isCamo()) return;
   spinAngle = (spinAngle + 360 * t.cfg.chunk * rpm / 60) % 360;
   cv.style.transform = 'rotate(' + spinAngle.toFixed(2) + 'deg)';
 }
@@ -586,6 +589,16 @@ function drawQR(t, bytes){
     g.fillStyle = paper; g.fillRect(0, 0, cv.width, cv.height);
     g.fillStyle = ink;
     drawModules(g, qr, m, q * scale, q * scale, scale, round);
+  } else if (isCamo()){
+    /* v3.5：QR をカモフラージュ（drawQRCamo のコメント参照）。盤の装飾は #disc 層 */
+    const S = 1000, cx = S / 2, cy = S / 2;
+    if (cv.width !== S){ cv.width = cv.height = S; }
+    const labelR = Math.round(S * 0.468), block = Math.floor(labelR * 2 / Math.SQRT2) - 12;
+    const key = [S, labelR, sepia].join('|');
+    if (t.discKey !== key){ drawDisc(S, labelR); t.discKey = key; }
+    g.clearRect(0, 0, S, S);
+    g.fillStyle = paper; g.beginPath(); g.arc(cx, cy, labelR, 0, Math.PI * 2); g.fill();
+    drawQRCamo(g, qr, m, cx, cy, block / m, labelR, ink, round, t.qrCount || 0);
   } else {
     const S = 1000;
     if (cv.width !== S){ cv.width = cv.height = S; }
@@ -609,7 +622,32 @@ function drawQR(t, bytes){
   $('#sBytes').textContent = bytes.length;
   $('#sMod').textContent = m + '×' + m;
 }
-/* ラベル円のうちQR（クワイエットゾーン込み）の外側を、薄いドットで埋めて四角い輪郭を消す。
+/* v3.5 QR のカモフラージュ。
+   Aztec（v3.3/v3.4）は ZXing の検出（中央ブルズアイからの外挿）が実機のぼけ・ぶれに弱く、iPhone で欠損 30〜60% だったので撤回。
+   QR（実機で欠損 4% の実績）に戻し、四角を消す方をこちらで解く：
+   - QR の外側を、QR と同じ格子・同じ濃さ・密度 50% のランダムドットでラベル円まで埋める（四角の縁が消える）
+   - 白い余白（クワイエットゾーン）は規格では 4 モジュールだが、ZXing のファインダー検出に要るのは
+     ファインダーの外側の白だけなので、3 つのファインダーの周り 1 モジュールだけ白く残し、他は埋める
+     （ブラウザのサイズ掃引で、全周 1 モジュール／ファインダー周りのみ、とも素の QR と同じ結果。白なしは落ちる）
+   - 乱数は枚ごとに変える（固定だと QR 部分だけがちらついて四角が見える）
+   残るのは角の 3 つの目。これは QR 検出の根幹なので消せない */
+function drawQRCamo(g, qr, m, cx, cy, scale, labelR, ink, round, frame){
+  const o = cx - m * scale / 2;
+  const nearFinder = (gx, gy) => { for (const [fx, fy] of [[0, 0], [m - 7, 0], [0, m - 7]]) if (gx >= fx - 1 && gx < fx + 8 && gy >= fy - 1 && gy < fy + 8) return true; return false; };
+  let seed = (frame * 2654435761) >>> 0 || 7; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  const ext = Math.ceil(labelR / scale) + 1, lim = (labelR - scale) * (labelR - scale);
+  g.fillStyle = ink;
+  for (let gy = -ext; gy <= m + ext; gy++) for (let gx = -ext; gx <= m + ext; gx++){
+    if (gx >= 0 && gx < m && gy >= 0 && gy < m) continue;
+    if (nearFinder(gx, gy)) continue;
+    const x = o + gx * scale, y = o + gy * scale, dx = x + scale / 2 - cx, dy = y + scale / 2 - cy;
+    if (dx * dx + dy * dy > lim || rnd() >= 0.5) continue;
+    if (round){ g.beginPath(); g.arc(x + scale / 2, y + scale / 2, scale * 0.6, 0, Math.PI * 2); g.fill(); }
+    else g.fillRect(x, y, scale + 0.3, scale + 0.3);
+  }
+  drawModules(g, qr, m, o, o, scale, round);
+}
+/* （v3 の旧方式、見た目「盤面の埋め：薄いドット（旧）」）ラベル円のうちQR（クワイエットゾーン込み）の外側を、薄いドットで埋めて四角い輪郭を消す。
    濃さ30%は jsQR の二値化で「白」側に落ちることを確認済み（v22〜v32、ぼかし付きで検証）。
    配置は固定シード乱数なので毎枚同じ模様になり、回転時に模様が一緒に回る */
 function drawFiller(g, ink, ox, oy, cells, scale, cx, cy, labelR, round){
@@ -631,7 +669,7 @@ function drawModules(g, qr, m, ox, oy, scale, round){
     if (!qr.isDark(r, c)) continue;
     const x = ox + c * scale, y = oy + r * scale;
     if (round && !isFinder(r, c, m)){ g.beginPath(); g.arc(x + scale / 2, y + scale / 2, rad, 0, Math.PI * 2); g.fill(); }
-    else g.fillRect(x, y, scale, scale);
+    else g.fillRect(x, y, scale + 0.3, scale + 0.3);  /* 倍率が小数のとき隣接モジュール間に筋が出ないよう僅かに重ねる */
   }
 }
 
@@ -698,7 +736,7 @@ function drawAztec(t, Ms, nbytes, frame){
     g.clearRect(0, 0, S, S);
     g.fillStyle = paper; g.beginPath(); g.arc(cx, cy, labelR, 0, Math.PI * 2); g.fill();
     g.fillStyle = ink;
-    if ($('#fill').value === 'dots'){
+    if ($('#fill').value !== 'none'){
       /* カモフラージュ：シンボルの枠の外を同じ格子でランダムに埋める。乱数は枚ごとに変える */
       let seed = (frame * 2654435761) >>> 0 || 7; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
       /* 占有判定は各シンボルの実寸で（小さいシンボルを枠の中央に置いた余りもカモで埋める） */
