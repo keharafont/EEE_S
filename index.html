@@ -4,13 +4,14 @@
 <meta charset="utf-8">
 <meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>映すラジオ：QRで音を送る v3.2</title>
+<title>映すラジオ：QRで音を送る v3.3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.4/dist/iife/reader/index.js"></script>
+<!-- v3.3: reader → full（Aztec の生成に writer が要る。.wasm 約1.4MB は jsDelivr から自動取得） -->
+<script src="https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.4/dist/iife/full/index.js"></script>
 <style>
 :root{
   --bg:#e6e8ea; --ink:#1c2127; --muted:#5d6670; --line:#c3c9cf; --panel:#f1f2f3;
@@ -120,10 +121,16 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
     </div>
 
     <div class="row">
+      <label class="field">コード
+        <select id="code">
+          <option value="aztec" selected>Aztec（真円に切り抜き）</option>
+          <option value="qr">QR（四角）</option>
+        </select>
+      </label>
       <label class="field">見た目
         <select id="look">
           <option value="record" selected>レコード盤</option>
-          <option value="plain">QRのみ（白地）</option>
+          <option value="plain">コードのみ（白地・切り抜きなし）</option>
         </select>
       </label>
       <label class="field">回転（コマ送り）
@@ -202,13 +209,13 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
     <p class="err" id="txErr"></p>
     <div class="stage" id="txStage">
       <canvas id="qr" hidden></canvas>
-      <div class="idle" id="txIdle">ここにQRコードが表示されます</div>
+      <div class="idle" id="txIdle">ここにコードが表示されます</div>
     </div>
     <div class="meter" aria-hidden="true"><i id="lvl"></i></div>
     <div class="stats">
-      <div class="stat"><b id="sVer">–</b><span>QRバージョン</span></div>
+      <div class="stat"><b id="sVer">–</b><span>コード</span></div>
       <div class="stat"><b id="sBytes">–</b><span>1枚のバイト数</span></div>
-      <div class="stat"><b id="sRate">–</b><span>QR枚数／秒</span></div>
+      <div class="stat"><b id="sRate">–</b><span>枚数／秒</span></div>
       <div class="stat"><b id="sMod">–</b><span>モジュール数</span></div>
     </div>
     <p class="note">画面の明るさを最大にしてください。音質・詳細設定の変更は次の送信開始から反映されます（見た目は即時）。</p>
@@ -222,7 +229,7 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
       <label class="field">デコーダ
         <select id="decoder">
           <option value="zxing" selected>ZXing（WASM・推奨）</option>
-          <option value="jsqr">jsQR（v2まで）</option>
+          <option value="jsqr">jsQR（QRのみ・Aztec不可）</option>
         </select>
       </label>
       <label class="field">読み取り解像度（長辺）
@@ -280,26 +287,38 @@ const PRESETS = [
   { name:'短波',    rate:6000, chunk:0.24, red:2, ec:'L', buf:3.0 },
   { name:'AMラジオ', rate:8000, chunk:0.24, red:2, ec:'L', buf:4.0 },
 ];
+/* v3.3 Aztec（誤り訂正50%）は1枚 829 バイトが上限。真円に切り抜いた分（面積の21.5%）を誤り訂正で埋めるため、
+   これより低い誤り訂正では復号できない（Node 上の ZXing で測定済み）。プリセットの冗長2倍（979バイト）は入らないので 1 倍にする */
+const AZTEC_MAX = 829;
+const isAztec = () => $('#code').value === 'aztec';
 function applyPreset(i){
   const p = PRESETS[i];
-  $('#rate').value = p.rate; $('#chunk').value = p.chunk; $('#red').value = p.red; $('#ec').value = p.ec; $('#buf').value = p.buf.toFixed(1);
+  $('#rate').value = p.rate; $('#chunk').value = p.chunk; $('#red').value = isAztec() ? 1 : p.red; $('#ec').value = p.ec; $('#buf').value = p.buf.toFixed(1);
   $('#dialName').textContent = p.name;
   describe();
 }
 function readCfg(){
-  return { rate:+$('#rate').value, chunk:+$('#chunk').value, red:+$('#red').value, ec:$('#ec').value, buf:+$('#buf').value, fix:$('#fixver').checked };
+  return { rate:+$('#rate').value, chunk:+$('#chunk').value, red:+$('#red').value, ec:$('#ec').value, buf:+$('#buf').value, fix:$('#fixver').checked, code:$('#code').value };
 }
-function describe(){
-  const c = readCfg(), codec = $('#codec').value;
+function packetBytes(c, codec){
   let perChunk;
   if (codec === 'adpcm') perChunk = 3 + Math.round(c.rate * c.chunk / 2);
   else perChunk = Math.round({ opus12:1500, opus16:2000 }[codec] * c.chunk) + Math.round(c.chunk / FRAME_SEC);
-  const bytes = 5 + c.red * (4 + perChunk);
-  $('#dialDesc').textContent = `${codec === 'adpcm' ? c.rate / 1000 + ' kHz ADPCM' : codec.replace('opus','Opus ') + 'kbps'}　約${bytes}バイト／枚　${(1 / c.chunk).toFixed(1)}枚／秒　冗長${c.red}倍　遅延${c.buf.toFixed(1)}秒`;
+  return 5 + c.red * (4 + perChunk);
+}
+function describe(){
+  const c = readCfg(), codec = $('#codec').value, bytes = packetBytes(c, codec);
+  let s = `${codec === 'adpcm' ? c.rate / 1000 + ' kHz ADPCM' : codec.replace('opus','Opus ') + 'kbps'}　約${bytes}バイト／枚　${(1 / c.chunk).toFixed(1)}枚／秒　冗長${c.red}倍　遅延${c.buf.toFixed(1)}秒`;
+  if (isAztec() && bytes > AZTEC_MAX) s += `　⚠ Aztec の上限 ${AZTEC_MAX} バイトを超えています（冗長度を1倍に、またはレートを下げる）`;
+  $('#dialDesc').textContent = s;
 }
 $('#dial').oninput = () => applyPreset(+$('#dial').value);
 for (const id of ['rate','chunk','red','ec','buf']) $('#' + id).onchange = () => { $('#dialName').textContent = 'カスタム'; describe(); };
 $('#codec').onchange = describe;
+$('#code').onchange = () => {
+  if ($('#dialName').textContent !== 'カスタム') applyPreset(+$('#dial').value); else describe();
+  applyLook(); if (tx_ && tx_.lastPkt) drawCode(tx_, tx_.lastPkt);
+};
 applyPreset(1);
 
 /* ---------- tabs / look ---------- */
@@ -319,17 +338,23 @@ let spinAngle = 0;
 function applyLook(){
   const cv = $('#qr'), rpm = +$('#rpm').value, record = $('#look').value === 'record';
   cv.classList.toggle('plain', !record);
-  if (!record || rpm === 0){ spinAngle = 0; cv.style.transform = ''; }
+  if (!record || rpm === 0){ spinAngle = 0; }
+  /* Aztec は canvas の中で回す（下記）ので CSS の回転は使わない */
+  if (!record || rpm === 0 || isAztec()) cv.style.transform = '';
   $('#txStage').classList.toggle('vinyl', record);
 }
-/* QRが切り替わる瞬間だけ盤を回す。表示中は静止（カメラの露光中に像が流れない） */
+/* コードが切り替わる瞬間だけ盤を回す。表示中は静止（カメラの露光中に像が流れない）。
+   QR: canvas ごと CSS で回す。
+   Aztec: ZXing の Aztec 検出は 0°/90° から ±20° までは全条件で読めるが 45° 付近はモジュールが小さいと落ちる（Node で測定）。
+   33rpm×0.24秒 ≒ 47.5°/枚 で最悪の角度を踏むので、シンボルは 90° 刻みに丸め、装飾（埋めドット）だけを自由な角度で回す。
+   中身は毎枚変わるのでシンボルが回って見えることはなく、回転の手がかりは装飾側で十分 */
 function stepSpin(t){
   const cv = $('#qr'), rpm = +$('#rpm').value, record = $('#look').value === 'record';
   if (!record || rpm === 0) return;
   spinAngle = (spinAngle + 360 * t.cfg.chunk * rpm / 60) % 360;
-  cv.style.transform = 'rotate(' + spinAngle.toFixed(2) + 'deg)';
+  if (!isAztec()) cv.style.transform = 'rotate(' + spinAngle.toFixed(2) + 'deg)';
 }
-for (const id of ['look','rpm','dots','tone','fill']) $('#' + id).onchange = () => { applyLook(); if (tx_ && tx_.lastPkt) drawQR(tx_, tx_.lastPkt); };
+for (const id of ['look','rpm','dots','tone','fill']) $('#' + id).onchange = () => { applyLook(); if (tx_ && tx_.lastPkt) drawCode(tx_, tx_.lastPkt); };
 applyLook();
 
 /* ---------- IMA ADPCM ---------- */
@@ -454,7 +479,7 @@ async function startTx(){
     t.hist.unshift(cur); if (t.hist.length > cfg.red) t.hist.length = cfg.red;
     const pkt = buildPacket(codec, rateForHeader, cfg.buf, t.hist);
     t.lastPkt = pkt;
-    drawQR(t, pkt); stepSpin(t); t.qrCount++;
+    stepSpin(t); drawCode(t, pkt); t.qrCount++;
   };
 
   if (codec === CODEC_OPUS){
@@ -583,6 +608,100 @@ function drawModules(g, qr, m, ox, oy, scale, round){
     else g.fillRect(x, y, scale, scale);
   }
 }
+
+/* ---------- v3.3 Aztec（真円） ----------
+   QR は四隅のファインダーが必須だが、Aztec は中央のブルズアイだけで位置・向き・大きさを決めるので四隅はデータだけ。
+   誤り訂正を 50%（zint の level 4）にして内接円で切り抜くと、失う面積 21.5% を誤り訂正が吸収して復号できる
+   （Node 上の zxing-wasm 2.2.4 で、縮小 2〜6px/モジュール × ぼかし × 回転で、切り抜きなしと同じ成功率を確認）。
+   半径は辺のちょうど 1/2。0.48 では落ちるので余裕は無く、これ以上は削らない。
+   シンボルは zxing-wasm の writer で作り、返ってくる SVG の矩形（M x y h w v h h-w Z）からモジュール行列を起こす */
+const AZTEC_WRITE = { format:'Aztec', ecLevel:'4', scale:1, withQuietZones:false };
+async function aztecMatrix(bytes){
+  const r = await ZXingWASM.writeBarcode(bytes, AZTEC_WRITE);
+  if (r.error || !r.svg) throw new Error(r.error || 'Aztec を生成できませんでした');
+  const n = +r.svg.match(/<svg width="(\d+)"/)[1];
+  const M = Array.from({ length: n }, () => new Uint8Array(n));
+  const re = /M(\d+) (\d+)h(\d+)v(\d+)h-?\d+Z/g; let m;
+  while ((m = re.exec(r.svg))){
+    const x = +m[1], y = +m[2], w = +m[3], h = +m[4];
+    for (let yy = y; yy < y + h; yy++) M[yy].fill(1, x, x + w);
+  }
+  return M;
+}
+function drawCode(t, bytes){
+  if (!isAztec()) return drawQR(t, bytes);
+  if (typeof ZXingWASM === 'undefined' || !ZXingWASM.writeBarcode){
+    $('#txErr').textContent = 'ZXing（writer）を読み込めていないので Aztec は使えません。QR に切り替えます。';
+    $('#code').value = 'qr'; applyLook(); return drawQR(t, bytes);
+  }
+  const seq = t.drawSeq = (t.drawSeq || 0) + 1;
+  aztecMatrix(bytes).then(M => {
+    if (t.drawSeq !== seq || tx_ !== t) return;   /* 生成中に次の枚が来ていたら捨てる */
+    $('#txErr').textContent = '';
+    drawAztec(t, M, bytes.length);
+  }).catch(e => { $('#txErr').textContent = 'Aztec に収まりませんでした（上限 ' + AZTEC_MAX + ' バイト）。冗長度を1倍にするかレートを下げてください。'; });
+}
+function drawAztec(t, M, nbytes){
+  const n = M.length;
+  const record = $('#look').value === 'record', round = $('#dots').value === 'round', sepia = $('#tone').value === 'sepia';
+  const ink = sepia ? '#2b1a0c' : '#000', paper = sepia ? '#f1e6cd' : '#fff';
+  const cv = $('#qr'), g = cv.getContext('2d');
+  if (!record){
+    /* 白地・切り抜きなし（読み取りの比較基準用） */
+    const q = 4, scale = Math.max(2, Math.floor(900 / (n + q * 2))), S = (n + q * 2) * scale;
+    if (cv.width !== S){ cv.width = cv.height = S; }
+    g.fillStyle = paper; g.fillRect(0, 0, S, S);
+    g.fillStyle = ink; aztecModules(g, M, q * scale, q * scale, scale, round);
+  } else {
+    const S = 1000;
+    if (cv.width !== S){ cv.width = cv.height = S; }
+    g.clearRect(0, 0, S, S);
+    const cx = S / 2, cy = S / 2;
+    const scale = Math.max(2, Math.floor(Math.floor(S / 1.4) / n)), side = n * scale, R = side / 2;
+    const labelR = Math.min(S / 2 - 14, R + 60);
+    g.fillStyle = '#0e0b09'; g.beginPath(); g.arc(cx, cy, S / 2 - 2, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,0.07)'; g.lineWidth = 1.2;
+    for (let r = labelR + 10; r < S / 2 - 12; r += 5){ g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke(); }
+    g.strokeStyle = 'rgba(255,255,255,0.16)'; g.lineWidth = 2;
+    for (const r of [labelR + 4, S / 2 - 8]){ g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke(); }
+    g.fillStyle = paper; g.beginPath(); g.arc(cx, cy, labelR, 0, Math.PI * 2); g.fill();
+    /* 装飾（埋めドットの環）は自由な角度で回す */
+    if ($('#fill').value === 'dots'){
+      g.save(); g.translate(cx, cy); g.rotate(spinAngle * Math.PI / 180);
+      let seed = 7; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+      const inner = (R + scale) * (R + scale), outer = (labelR - scale) * (labelR - scale), ext = Math.ceil(labelR / scale) + 1;
+      g.fillStyle = ink; g.globalAlpha = 0.3;
+      for (let r = -ext; r <= ext; r++) for (let c = -ext; c <= ext; c++){
+        const x = c * scale + scale / 2, y = r * scale + scale / 2, d2 = x * x + y * y;
+        if (d2 < inner || d2 > outer || rnd() >= 0.5) continue;
+        if (round){ g.beginPath(); g.arc(x, y, scale * 0.6, 0, Math.PI * 2); g.fill(); }
+        else g.fillRect(x - scale / 2, y - scale / 2, scale, scale);
+      }
+      g.restore();
+    }
+    /* シンボルは 90° 刻み。真円で切り抜く */
+    const symAngle = Math.round(spinAngle / 90) * 90;
+    g.save(); g.translate(cx, cy); g.rotate(symAngle * Math.PI / 180);
+    g.beginPath(); g.arc(0, 0, R, 0, Math.PI * 2); g.clip();
+    g.fillStyle = ink; aztecModules(g, M, -side / 2, -side / 2, scale, round);
+    g.restore();
+  }
+  cv.hidden = false; $('#txIdle').hidden = true;
+  $('#sVer').textContent = 'Aztec';
+  $('#sBytes').textContent = nbytes;
+  $('#sMod').textContent = n + '×' + n;
+}
+function aztecModules(g, M, ox, oy, scale, round){
+  const n = M.length, rad = scale * 0.6;
+  for (let r = 0; r < n; r++){ const row = M[r];
+    for (let c = 0; c < n; c++){
+      if (!row[c]) continue;
+      const x = ox + c * scale, y = oy + r * scale;
+      if (round){ g.beginPath(); g.arc(x + scale / 2, y + scale / 2, rad, 0, Math.PI * 2); g.fill(); }
+      else g.fillRect(x, y, scale, scale);
+    }
+  }
+}
 function stopTx(){
   const t = tx_; tx_ = null;
   $('#txBtn').textContent = '送信を開始'; $('#txBtn').classList.remove('stop');
@@ -666,7 +785,7 @@ function updateGuide(){
   g.style.width = (vw / crop) + 'px'; g.style.height = (vh / crop) + 'px'; g.hidden = false;
 }
 $('#crop').onchange = updateGuide; window.addEventListener('resize', updateGuide);
-const ZX_OPTS = { formats:['QRCode'], tryHarder:true, tryRotate:true, tryInvert:false, tryDownscale:true, maxNumberOfSymbols:1 };
+const ZX_OPTS = { formats:['QRCode','Aztec'], tryHarder:true, tryRotate:true, tryInvert:false, tryDownscale:true, maxNumberOfSymbols:1 };
 async function scan(r){
   const v = $('#video');
   if (v.readyState < 2 || !v.videoWidth) return;
