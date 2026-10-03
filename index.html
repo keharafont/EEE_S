@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>映すラジオ — Projected Radio v3.14</title>
+<title>映すラジオ — Projected Radio v3.15</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Noto+Serif:wght@400;700&display=swap" rel="stylesheet">
@@ -57,7 +57,12 @@ main{
 .seg button{appearance:none; border:0; background:transparent; color:var(--ink); font:inherit; font-weight:700; font-size:17px; padding:9px; cursor:pointer}
 .seg button + button{border-left:1px solid var(--ink)}
 .seg.quad{grid-template-columns:repeat(4,1fr); margin:8px 0 6px}
-.seg.quad button{font-size:15px; padding:8px 4px}
+.seg.quad.icons{display:grid; width:100%}
+.seg.quad.icons button{font-size:12px; padding:6px 4px 4px}
+.seg.quad.icons button svg{width:24px; height:24px}
+/* タブ：アイコン＋文字を横並び */
+#tabTx, #tabRx{display:flex; align-items:center; justify-content:center; gap:8px}
+#tabTx svg, #tabRx svg{width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round}
 .seg button[aria-pressed="true"]{background-color:var(--ink); color:var(--paper); background-image:radial-gradient(rgba(211,213,208,.30) .55px, transparent .95px); background-size:3px 3px}
 
 /* 設定行：左にラベル、右に値。下に 1px の罫線 */
@@ -105,6 +110,8 @@ details .row{margin-top:4px}
 /* 大きなボタン（参考画像の Module/Mode の帯） */
 .go{appearance:none; border:1px solid var(--ink); border-radius:4px; font:inherit; font-weight:700; font-size:26px; line-height:1.2; padding:12px 14px; width:100%; cursor:pointer; margin:6px 0 14px; text-align:left;
   background-color:var(--ink); color:var(--paper); background-image:radial-gradient(rgba(211,213,208,.30) .55px, transparent .95px); background-size:3px 3px}
+.go{display:flex; align-items:center; gap:14px}
+.go svg{width:30px; height:30px; flex:none; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round}
 .go.stop{background:transparent; color:var(--ink)}
 
 /* 表示枠 */
@@ -166,11 +173,11 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
       <div class="hint">Scan to open this page on a phone. Tap anywhere to close.</div>
     </div>
   </div>
-  <p class="lede">Sound carried only by the light of a QR code on a screen. No network. <span class="v">v3.14</span></p>
+  <p class="lede">Sound carried only by the light of a QR code on a screen. No network. <span class="v">v3.15</span></p>
 
   <div class="seg" role="group" aria-label="Mode">
-    <button id="tabTx" aria-pressed="true">Transmit</button>
-    <button id="tabRx" aria-pressed="false">Receive</button>
+    <button id="tabTx" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="13" height="10" rx="1"/><path d="M7 19h5M9.5 15v4"/><path d="M18.5 8a4 4 0 0 1 0 4M21 6a7.5 7.5 0 0 1 0 8"/></svg><span>Transmit</span></button>
+    <button id="tabRx" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M11 5.5h2"/></svg><span>Receive</span></button>
   </div>
 
   <section id="txPanel">
@@ -199,11 +206,11 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
 
     <div class="dial" id="dialBox">
       <div class="hd"><span>Quality</span><b id="dialName">Telephone</b></div>
-      <div class="seg quad" id="presets" role="group" aria-label="Quality">
-        <button type="button" data-i="0">Cylinder</button>
-        <button type="button" data-i="1" aria-pressed="true">Telephone</button>
-        <button type="button" data-i="2">Shortwave</button>
-        <button type="button" data-i="3">AM</button>
+      <div class="seg quad icons" id="presets" role="group" aria-label="Quality">
+        <button type="button" data-i="0"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12M6 17h12"/><ellipse cx="6" cy="12" rx="2.2" ry="5"/><ellipse cx="18" cy="12" rx="2.2" ry="5"/><path d="M10 7.3v9.4M14 7.3v9.4" stroke-dasharray="1.2 1.6"/></svg><span>Cylinder</span></button>
+        <button type="button" data-i="1" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h3l2 5-2.5 1.5a11 11 0 0 0 6 6L15 14l5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg><span>Telephone</span></button>
+        <button type="button" data-i="2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21l-4-11h8z"/><path d="M8.5 7a5 5 0 0 1 7 0M6 4.5a9 9 0 0 1 12 0"/></svg><span>Shortwave</span></button>
+        <button type="button" data-i="3"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="9" width="18" height="11" rx="2"/><circle cx="16" cy="14.5" r="2.5"/><path d="M6 13h5M6 16h5M7 9l8-5"/></svg><span>AM</span></button>
       </div>
       <div class="desc" id="dialDesc"></div>
     </div>
@@ -281,7 +288,7 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
       </div>
     </details>
 
-    <button class="go" id="txBtn">Start transmitting</button>
+    <button class="go" id="txBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="13" height="10" rx="1"/><path d="M7 19h5M9.5 15v4"/><path d="M18.5 8a4 4 0 0 1 0 4M21 6a7.5 7.5 0 0 1 0 8"/></svg><span>Start</span></button>
     <p class="err" id="txErr"></p>
     <div class="stage" id="txStage">
       <button class="fsbtn" id="txFull" type="button">Full screen</button>
@@ -327,7 +334,7 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
         </select>
       </div>
     </div>
-    <button class="go" id="rxBtn">Start receiving</button>
+    <button class="go" id="rxBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M11 5.5h2"/></svg><span>Start</span></button>
     <p class="err" id="rxErr"></p>
     <div class="stage cam" id="rxStage">
       <button class="fsbtn" id="rxFull" type="button">Full screen</button>
@@ -439,6 +446,14 @@ document.addEventListener('fullscreenchange', () => {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') for (const el of document.querySelectorAll('.stage.full')) toggleFull(el.id); });
 $('#txFull').onclick = () => toggleFull('txStage');
 $('#rxFull').onclick = () => toggleFull('rxStage');
+
+/* Start／Stop ボタンの表示（アイコン＋一語） */
+const GO_ICONS = {
+  tx:'<rect x="3" y="5" width="13" height="10" rx="1"/><path d="M7 19h5M9.5 15v4"/><path d="M18.5 8a4 4 0 0 1 0 4M21 6a7.5 7.5 0 0 1 0 8"/>',
+  rx:'<rect x="7" y="2.5" width="10" height="19" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M11 5.5h2"/>',
+  stop:'<rect x="6" y="6" width="12" height="12"/>',
+};
+function setGo(btn, label, icon){ btn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + GO_ICONS[icon] + '</svg><span>' + label + '</span>'; }
 
 /* ---------- v3.14 選択項目をアイコン付きボタンに ----------
    select は隠したまま値の置き場として残し（既存コードは select.value を読む）、ボタンが select.value を変えて change を起こす */
@@ -634,7 +649,7 @@ async function startTx(){
   const ctx = new AudioContext({ sampleRate: 48000 });
   await ctx.resume();
   const t = tx_ = { ctx, codec, mode, cfg, seq: 0, hist: [], qrCount: 0, t0: performance.now(), level: 0, fixedVer: 0, live: false };
-  $('#txBtn').textContent = 'Stop transmitting'; $('#txBtn').classList.add('stop');
+  setGo($('#txBtn'), 'Stop', 'stop'); $('#txBtn').classList.add('stop');
 
   let srcNode;
   if ($('#src').value === 'mic'){
@@ -949,7 +964,7 @@ function aztecModules(g, M, ox, oy, scale, round){
 }
 function stopTx(){
   const t = tx_; tx_ = null;
-  $('#txBtn').textContent = 'Start transmitting'; $('#txBtn').classList.remove('stop');
+  setGo($('#txBtn'), 'Start', 'tx'); $('#txBtn').classList.remove('stop');
   $('#lvl').style.width = '0';
   if (!t){ $('#qr').classList.remove('on'); clearFade(); return; }
   clearInterval(t.timer);
@@ -973,7 +988,7 @@ async function startRx(){
   $('#rxErr').textContent = '';
   const actx = new AudioContext(); await actx.resume();
   const r = rx = { actx, reads: 0, t0: performance.now(), recent: [], scans: [], started: false, lastRecv: -1e9 };
-  $('#rxBtn').textContent = 'Stop receiving'; $('#rxBtn').classList.add('stop');
+  setGo($('#rxBtn'), 'Stop', 'stop'); $('#rxBtn').classList.add('stop');
   r.out = actx.createGain(); r.out.connect(actx.destination);
   const camId = $('#cam').value;
   const vc = camId ? { deviceId:{ exact: camId } } : { facingMode:{ ideal:'environment' } };
@@ -1180,7 +1195,7 @@ function rxStats(r){
 }
 function stopRx(){
   const r = rx; rx = null;
-  $('#rxBtn').textContent = 'Start receiving'; $('#rxBtn').classList.remove('stop');
+  setGo($('#rxBtn'), 'Start', 'rx'); $('#rxBtn').classList.remove('stop');
   $('#rxIdle').hidden = false; $('#guide').hidden = true; $('#zoomBox').hidden = true; $('#hud').hidden = true;
   if (!r) return;
   cancelAnimationFrame(r.raf); clearInterval(r.tick); clearInterval(r.ui); r.busy = true;
