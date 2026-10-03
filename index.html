@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>映すラジオ：QRで音を送る v3.5</title>
+<title>映すラジオ：QRで音を送る v3.6</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
@@ -81,6 +81,16 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
 .stat span{font-size:12px; color:var(--muted)}
 .note{font-size:13px; color:var(--muted); margin-top:14px}
 .err{color:var(--warn); font-size:14px; margin:8px 0; min-height:1em}
+/* v3.6 全画面（Fullscreen API が使えない Safari でも同じ見た目になるよう、CSS の固定表示で実現） */
+.stage.full{position:fixed; inset:0; z-index:50; border-radius:0; border:0; padding:0; margin:0; background:#000; display:flex; align-items:center; justify-content:center}
+.stage.full #wrap{max-width:min(100vw,100vh); width:min(100vw,100vh)}
+.stage.full video{max-height:100vh; height:100vh; width:100vw; object-fit:contain}
+.fsbtn{position:absolute; right:10px; top:10px; z-index:2; appearance:none; border:1px solid rgba(255,255,255,.35); background:rgba(0,0,0,.45); color:#fff; font:inherit; font-size:13px; padding:6px 10px; border-radius:8px; cursor:pointer}
+.stage:not(.vinyl):not(.cam) .fsbtn{color:#1c2127; background:rgba(255,255,255,.7); border-color:rgba(0,0,0,.25)}
+/* v3.6 受信側 HUD：カメラ映像に重ねる */
+#hud{position:absolute; left:10px; top:10px; z-index:2; color:#fff; font-size:12px; line-height:1.5; background:rgba(0,0,0,.45); padding:6px 9px; border-radius:8px; pointer-events:none; font-variant-numeric:tabular-nums; white-space:pre}
+#zoomBox{position:absolute; left:12px; right:12px; bottom:10px; z-index:2; margin:0; background:rgba(0,0,0,.45); border-color:rgba(255,255,255,.25); color:#fff; padding:6px 12px}
+#zoomBox .hd{color:#ddd} #zoomBox .hd b{color:#fff; font-size:15px} #zoomBox input[type=range]{margin:4px 0 0}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -217,6 +227,7 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
     <button class="go" id="txBtn">送信を開始</button>
     <p class="err" id="txErr"></p>
     <div class="stage" id="txStage">
+      <button class="fsbtn" id="txFull" type="button">全画面</button>
       <div id="wrap" hidden>
         <canvas id="disc" hidden></canvas>
         <canvas id="qr"></canvas>
@@ -260,15 +271,17 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
         </select>
       </label>
     </div>
-    <div class="dial" id="zoomBox" hidden>
-      <div class="hd"><span>カメラのズーム</span><b id="zoomVal">1.0×</b></div>
-      <input type="range" id="zoom" min="1" max="1" step="0.1" value="1" aria-label="ズーム">
-    </div>
     <button class="go" id="rxBtn">受信を開始</button>
     <p class="err" id="rxErr"></p>
     <div class="stage cam" id="rxStage">
+      <button class="fsbtn" id="rxFull" type="button">全画面</button>
       <video id="video" playsinline muted></video>
       <div id="guide" hidden></div>
+      <div id="hud" hidden></div>
+      <div class="dial" id="zoomBox" hidden>
+        <div class="hd"><span>カメラのズーム</span><b id="zoomVal">1.0×</b></div>
+        <input type="range" id="zoom" min="1" max="1" step="0.1" value="1" aria-label="ズーム">
+      </div>
       <div class="idle" id="rxIdle" style="color:#9aa3ab">カメラの映像がここに表示されます</div>
     </div>
     <div class="stats">
@@ -340,6 +353,30 @@ $('#code').onchange = () => {
   applyLook(); if (tx_ && tx_.lastPkt) drawCode(tx_, tx_.lastPkt);
 };
 applyPreset(1);
+
+/* ---------- v3.6 全画面 ----------
+   送信側: 盤を画面いっぱいに（PC のブラウザで受信側に見せる用）。受信側: カメラ映像を画面いっぱいに。
+   Fullscreen API があればそれを使い（Esc で戻れる）、無い環境（iOS Safari）は CSS の固定表示で代用。どちらも同じ class で見た目を揃える */
+function toggleFull(id){
+  const el = $('#' + id), on = !el.classList.contains('full');
+  if (on){
+    el.classList.add('full');
+    if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+  } else {
+    el.classList.remove('full');
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  }
+  for (const b of el.querySelectorAll('.fsbtn')) b.textContent = on ? '戻る' : '全画面';
+  updateGuide();
+}
+document.addEventListener('fullscreenchange', () => {
+  if (document.fullscreenElement) return;
+  for (const el of document.querySelectorAll('.stage.full')){ el.classList.remove('full'); for (const b of el.querySelectorAll('.fsbtn')) b.textContent = '全画面'; }
+  updateGuide();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') for (const el of document.querySelectorAll('.stage.full')) toggleFull(el.id); });
+$('#txFull').onclick = () => toggleFull('txStage');
+$('#rxFull').onclick = () => toggleFull('rxStage');
 
 /* ---------- tabs / look ---------- */
 function setTab(tx){
@@ -989,6 +1026,12 @@ function schedule(r){
     r.nextTime += r.chunkSec;
   }
 }
+function rxHud(r){
+  const h = $('#hud'); if (!rx){ h.hidden = true; return; }
+  const g = id => $('#' + id).textContent;
+  h.textContent = `読取 ${g('rRead')}/秒　試行 ${g('rScan')}/秒\n欠損 ${g('rLoss')}　遅延 ${g('rDelay')}秒\n${g('rCodec')}\n${g('rDec')}\n${g('rCam')}`;
+  h.hidden = false;
+}
 function rxStats(r){
   const now = performance.now();
   r.recent = r.recent.filter(t => now - t < 2000);
@@ -1006,11 +1049,12 @@ function rxStats(r){
   } else if (r.started && !signal){
     $('#rLoss').textContent = '信号なし';
   }
+  rxHud(r);
 }
 function stopRx(){
   const r = rx; rx = null;
   $('#rxBtn').textContent = '受信を開始'; $('#rxBtn').classList.remove('stop');
-  $('#rxIdle').hidden = false; $('#guide').hidden = true; $('#zoomBox').hidden = true;
+  $('#rxIdle').hidden = false; $('#guide').hidden = true; $('#zoomBox').hidden = true; $('#hud').hidden = true;
   if (!r) return;
   cancelAnimationFrame(r.raf); clearInterval(r.tick); clearInterval(r.ui); r.busy = true;
   r.stream?.getTracks().forEach(t => t.stop());
