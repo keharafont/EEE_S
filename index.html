@@ -4,10 +4,12 @@
 <meta charset="utf-8">
 <meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>映すラジオ — Projected Radio v3.10</title>
+<title>映すラジオ — Projected Radio v3.11</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Noto+Serif:wght@400;700&display=swap" rel="stylesheet">
+<!-- ロゴ用（5 文字だけサブセット） -->
+<link href="https://fonts.googleapis.com/css2?family=Zen+Antique&text=%E6%98%A0%E3%81%99%E3%83%A9%E3%82%B8%E3%82%AA&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <!-- v3.3: reader → full（Aztec の生成に writer が要る。.wasm 約1.4MB は jsDelivr から自動取得） -->
@@ -40,7 +42,7 @@ main{
 .bar{display:grid; grid-template-columns:1fr auto; gap:8px; margin-bottom:12px}
 .bar > *{border:1px solid var(--ink); padding:4px 10px; font-weight:700; font-size:18px; line-height:1.3}
 .bar .ver{font-weight:700; font-size:16px; display:flex; align-items:center; font-family:"Noto Serif",serif}
-#logo{display:flex; align-items:center}
+#logo{display:flex; align-items:center; font-family:"Zen Antique","Noto Serif JP",serif; font-weight:400; font-size:24px; letter-spacing:.06em; line-height:1}
 #logo img, #logo svg{height:26px; width:auto; display:block}
 .lede{margin:0 0 14px; color:var(--muted); font-size:13px}
 .lede .v{float:right; font-variant-numeric:tabular-nums}
@@ -62,7 +64,10 @@ select{
   background:transparent var(--chev) no-repeat right center; background-size:9px 9px; border:0; border-radius:0; padding:4px 14px 4px 0; text-align:right; direction:rtl;
 }
 select option{direction:ltr; text-align:left; font-weight:400; background:var(--paper); color:var(--ink)}
-input[type=file]{font:inherit; font-size:13px; color:var(--ink); background:transparent; border:0; padding:4px 0; width:100%}
+/* ファイル選択はブラウザ任せの文言（「ファイルを選択」）になるので自前のボタンにする */
+.filebox{display:flex; align-items:center; gap:10px; min-width:0}
+#fileName{font-size:13px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:40vw}
+#fileBtn{appearance:none; border:1px solid var(--ink); background:transparent; color:var(--ink); font:inherit; font-weight:700; font-size:14px; padding:4px 10px; border-radius:3px; cursor:pointer; white-space:nowrap}
 .check{display:flex; align-items:center; gap:10px; min-height:40px; padding:4px 0; border-bottom:1px solid var(--ink); font-size:15px; color:var(--ink)}
 .check input{appearance:none; -webkit-appearance:none; width:16px; height:16px; margin:0; border:1px solid var(--ink); background:transparent; flex:none; position:relative}
 .check input:checked{background:var(--ink)}
@@ -98,6 +103,9 @@ details .row{margin-top:4px}
 #wrap.wide{aspect-ratio:4/3}
 #wrap canvas{position:absolute; inset:0; width:100%; height:100%; display:block}
 #qr.plain{image-rendering:pixelated}
+/* v3.11 コード層は送信開始で浮かび上がり、停止で消える。下の #disc（白い円／4:3 の地）は常に出ている */
+#qr{opacity:0; transition:opacity 1.6s ease}
+#qr.on{opacity:1}
 .stage.cam{background:#000; padding:0; overflow:hidden}
 video{width:100%; display:block; max-height:60vh; object-fit:contain}
 #guide{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); border:2px dashed rgba(255,255,255,.7); pointer-events:none; box-sizing:border-box}
@@ -132,9 +140,9 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
 </head>
 <body>
 <main>
-  <!-- 左はロゴの受け皿（本人がロゴを作る予定。SVG や画像に差し替える）、右は英語名 -->
+  <!-- 左はロゴ（Zen Antique）、右は英語名 -->
   <div class="bar"><div id="logo">映すラジオ</div><div class="ver">Projected Radio</div></div>
-  <p class="lede">Sound carried only by the light of a QR code on a screen. No network. <span class="v">v3.10</span></p>
+  <p class="lede">Sound carried only by the light of a QR code on a screen. No network. <span class="v">v3.11</span></p>
 
   <div class="seg" role="group" aria-label="Mode">
     <button id="tabTx" aria-pressed="true">Transmit</button>
@@ -157,9 +165,10 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
         </select>
       </label>
     </div>
-    <div class="row" id="fileRow" hidden>
+    <div class="row" id="fileRow">
       <label class="field">File
-        <input type="file" id="file" accept="audio/*">
+        <span class="filebox"><span id="fileName">none</span><button type="button" id="fileBtn">Choose file</button></span>
+        <input type="file" id="file" accept="audio/*" hidden>
       </label>
       <label class="check"><input type="checkbox" id="monitor"> Monitor on this device</label>
     </div>
@@ -252,11 +261,10 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
     <p class="err" id="txErr"></p>
     <div class="stage" id="txStage">
       <button class="fsbtn" id="txFull" type="button">Full screen</button>
-      <div id="wrap" hidden>
-        <canvas id="disc" hidden></canvas>
+      <div id="wrap">
+        <canvas id="disc"></canvas>
         <canvas id="qr"></canvas>
       </div>
-      <div class="idle" id="txIdle">The code appears here</div>
     </div>
     <div class="meter" aria-hidden="true"><i id="lvl"></i></div>
     <div class="stats">
@@ -323,6 +331,7 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
 
 <script>
 const $ = s => document.querySelector(s);
+let tx_ = null, rx = null;   /* 送信・受信の状態。applyLook（起動時）から参照するので先頭で宣言 */
 const FRAME_US = 20000, FRAME_SEC = 0.02;
 const CODEC_OPUS = 1, CODEC_ADPCM = 2;
 const hasWC = typeof AudioEncoder !== 'undefined' && typeof AudioDecoder !== 'undefined';
@@ -415,7 +424,8 @@ function setTab(tx){
 }
 $('#tabTx').onclick = () => setTab(true);
 $('#tabRx').onclick = () => setTab(false);
-$('#src').onchange = () => { $('#fileRow').hidden = $('#src').value !== 'file'; };
+$('#fileBtn').onclick = () => $('#file').click();
+$('#file').onchange = () => { const f = $('#file').files[0]; $('#fileName').textContent = f ? f.name : 'none'; };
 if (!hasWC){
   for (const o of $('#codec').options) if (o.value.startsWith('opus')) o.disabled = true;
   $('#codec').value = 'adpcm';
@@ -425,7 +435,16 @@ function applyLook(){
   $('#qr').classList.toggle('plain', look === 'plain');
   $('#wrap').classList.toggle('wide', look === 'static');
   $('#txStage').classList.toggle('vinyl', look !== 'plain');
-  $('#disc').hidden = !isCamo();   /* 盤の装飾層は「円」のときだけ */
+  drawIdle();
+}
+/* 待機中の地（#disc）。円：黒い盤＋白いラベル円、4:3：白い矩形、コードのみ：白い正方形。
+   送信中はこの上にコード層（#qr）が重なる。コード層は不透明なので地は見えないが、フェードの間だけ透けて見える */
+function drawIdle(){
+  const look = $('#look').value, cv = $('#disc'), g = cv.getContext('2d');
+  if (look === 'record'){ if (cv.width !== 1000 || cv.height !== 1000){ cv.width = cv.height = 1000; } drawDisc(1000, Math.round(1000 * 0.468)); }
+  else if (look === 'static'){ cv.width = 1000; cv.height = 750; g.fillStyle = PAPER; g.fillRect(0, 0, 1000, 750); }
+  else { cv.width = cv.height = 1000; g.fillStyle = PAPER; g.fillRect(0, 0, 1000, 1000); }
+  if (tx_) tx_.discKey = null;
 }
 for (const id of ['look','dots']) $('#' + id).onchange = () => { applyLook(); if (tx_ && tx_.lastPkt) drawCode(tx_, tx_.lastPkt); };
 applyLook();
@@ -518,7 +537,6 @@ function parsePacket(b){
 }
 
 /* ---------- sender ---------- */
-let tx_ = null;
 $('#txBtn').onclick = () => tx_ ? stopTx() : startTx().catch(e => { $('#txErr').textContent = 'Could not start: ' + (e.message || e); stopTx(); });
 
 async function startTx(){
@@ -673,7 +691,7 @@ function drawQR(t, bytes){
     g.fillStyle = paper; g.beginPath(); g.arc(cx, cy, labelR, 0, Math.PI * 2); g.fill();
     drawQRCamo(g, qr, m, cx, cy, block / m, labelR, ink, round, t.qrCount || 0);
   }
-  $('#wrap').hidden = false; $('#txIdle').hidden = true;
+  $('#qr').classList.add('on');
   $('#sVer').textContent = (m - 17) / 4;
   $('#sBytes').textContent = bytes.length;
   $('#sMod').textContent = m + '×' + m;
@@ -795,7 +813,7 @@ function drawAztec(t, Ms, nbytes, frame){
     }
     for (const p of place(o, scale)) aztecModules(g, p.M, p.x, p.y, scale, round);
   }
-  $('#wrap').hidden = false; $('#txIdle').hidden = true;
+  $('#qr').classList.add('on');
   $('#sVer').textContent = 'Aztec×' + Ms.length;
   $('#sBytes').textContent = nbytes;
   $('#sMod').textContent = n + '×' + n + '×' + Ms.length;
@@ -816,6 +834,7 @@ function drawDisc(S, labelR){
   for (let r = labelR + 10; r < S / 2 - 12; r += 5){ g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke(); }
   g.strokeStyle = 'rgba(255,255,255,0.16)'; g.lineWidth = 2;
   for (const r of [labelR + 4, S / 2 - 8]){ g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke(); }
+  g.fillStyle = PAPER; g.beginPath(); g.arc(cx, cy, labelR, 0, Math.PI * 2); g.fill();   /* 待機中に見える白い円 */
 }
 /* 中央 15×15（ブルズアイ・向きの印・モード情報）は QR のファインダーと同じく常に四角で描く。
    丸ドットにすると環が点線になり検出が落ちる（ブラウザで確認） */
@@ -834,7 +853,7 @@ function aztecModules(g, M, ox, oy, scale, round){
 function stopTx(){
   const t = tx_; tx_ = null;
   $('#txBtn').textContent = 'Start transmitting'; $('#txBtn').classList.remove('stop');
-  $('#wrap').hidden = true; $('#txIdle').hidden = false; $('#lvl').style.width = '0';
+  $('#qr').classList.remove('on'); $('#lvl').style.width = '0';
   if (!t) return;
   clearInterval(t.timer);
   setHiss(t, false);
@@ -846,7 +865,6 @@ function stopTx(){
 }
 
 /* ---------- receiver ---------- */
-let rx = null;
 $('#rxBtn').onclick = () => rx ? stopRx() : startRx().catch(e => { $('#rxErr').textContent = 'Could not start: ' + (e.message || e); stopRx(); });
 
 async function startRx(){
