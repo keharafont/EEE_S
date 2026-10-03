@@ -39,10 +39,9 @@ main{
 .band{background-color:var(--ink); color:var(--paper); background-image:radial-gradient(rgba(211,213,208,.30) .55px, transparent .95px); background-size:3px 3px}
 
 /* タイトル行：左に名前、右に版 */
-.bar{display:grid; grid-template-columns:1fr auto; gap:8px; margin-bottom:12px}
-.bar > *{border:1px solid var(--ink); padding:4px 10px; font-weight:700; font-size:18px; line-height:1.3}
-.bar .ver{font-weight:700; font-size:16px; display:flex; align-items:center; font-family:"Noto Serif",serif}
-#logo{display:flex; align-items:center; font-family:"Zen Antique","Noto Serif JP",serif; font-weight:400; font-size:24px; letter-spacing:.06em; line-height:1}
+.bar{display:flex; align-items:baseline; gap:12px; border:1px solid var(--ink); padding:6px 10px 5px; margin-bottom:12px}
+#logo{font-family:"Zen Antique","Noto Serif JP",serif; font-weight:400; font-size:24px; letter-spacing:.06em; line-height:1}
+.bar .ver{font-weight:700; font-size:15px; font-family:"Noto Serif",serif; letter-spacing:.01em}
 #logo img, #logo svg{height:26px; width:auto; display:block}
 .lede{margin:0 0 14px; color:var(--muted); font-size:13px}
 .lede .v{float:right; font-variant-numeric:tabular-nums}
@@ -141,7 +140,7 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
 <body>
 <main>
   <!-- 左はロゴ（Zen Antique）、右は英語名 -->
-  <div class="bar"><div id="logo">映すラジオ</div><div class="ver">Projected Radio</div></div>
+  <div class="bar"><span id="logo">映すラジオ</span><span class="ver">Projected Radio</span></div>
   <p class="lede">Sound carried only by the light of a QR code on a screen. No network. <span class="v">v3.11</span></p>
 
   <div class="seg" role="group" aria-label="Mode">
