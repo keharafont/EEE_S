@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>映すラジオ — Projected Radio v3.13</title>
+<title>映すラジオ — Projected Radio v3.14</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Noto+Serif:wght@400;700&display=swap" rel="stylesheet">
@@ -74,6 +74,12 @@ select option{direction:ltr; text-align:left; font-weight:400; background:var(--
 .filebox{display:flex; align-items:center; gap:10px; min-width:0}
 #fileName{font-size:13px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:40vw}
 #fileBtn{appearance:none; border:1px solid var(--ink); background:transparent; color:var(--ink); font:inherit; font-weight:700; font-size:14px; padding:4px 10px; border-radius:3px; cursor:pointer; white-space:nowrap}
+/* v3.14 選択項目はアイコン付きのボタン群（select は隠して値の置き場に使う） */
+.opt{display:flex; justify-content:space-between; align-items:center; gap:10px; min-height:40px; padding:5px 0; border-bottom:1px solid var(--ink); font-size:16px}
+.seg.icons{display:inline-grid; grid-auto-flow:column; grid-auto-columns:1fr; margin:0; border-radius:3px}
+.seg.icons button{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; min-width:46px; padding:3px 6px 2px; font-size:10.5px; font-weight:700; line-height:1.1; letter-spacing:.01em}
+.seg.icons button svg{width:18px; height:18px; display:block; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round}
+.seg.icons button[disabled]{opacity:.35; cursor:default}
 .check{display:flex; align-items:center; gap:10px; min-height:40px; padding:4px 0; border-bottom:1px solid var(--ink); font-size:15px; color:var(--ink)}
 .check input{appearance:none; -webkit-appearance:none; width:16px; height:16px; margin:0; border:1px solid var(--ink); background:transparent; flex:none; position:relative}
 .check input:checked{background:var(--ink)}
@@ -160,7 +166,7 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
       <div class="hint">Scan to open this page on a phone. Tap anywhere to close.</div>
     </div>
   </div>
-  <p class="lede">Sound carried only by the light of a QR code on a screen. No network. <span class="v">v3.13</span></p>
+  <p class="lede">Sound carried only by the light of a QR code on a screen. No network. <span class="v">v3.14</span></p>
 
   <div class="seg" role="group" aria-label="Mode">
     <button id="tabTx" aria-pressed="true">Transmit</button>
@@ -169,19 +175,19 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
 
   <section id="txPanel">
     <div class="row">
-      <label class="field">Source
-        <select id="src">
+      <div class="opt"><span>Source</span><div class="seg icons" id="g_src"></div>
+        <select id="src" hidden>
           <option value="mic">Microphone</option>
           <option value="file">Audio file (loop)</option>
         </select>
-      </label>
-      <label class="field">Codec
-        <select id="codec">
+      </div>
+      <div class="opt"><span>Codec</span><div class="seg icons" id="g_codec"></div>
+        <select id="codec" hidden>
           <option value="adpcm" selected>ADPCM</option>
           <option value="opus12">Opus 12k (PC only)</option>
           <option value="opus16">Opus 16k (PC only)</option>
         </select>
-      </label>
+      </div>
     </div>
     <div class="row" id="fileRow">
       <label class="field">File
@@ -203,25 +209,25 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
     </div>
 
     <div class="row">
-      <label class="field">Code
-        <select id="code">
+      <div class="opt"><span>Code</span><div class="seg icons" id="g_code"></div>
+        <select id="code" hidden>
           <option value="qr" selected>QR</option>
           <option value="aztec">Aztec 2×2 (experimental)</option>
         </select>
-      </label>
-      <label class="field">Look
-        <select id="look">
+      </div>
+      <div class="opt"><span>Look</span><div class="seg icons" id="g_look"></div>
+        <select id="look" hidden>
           <option value="record" selected>Circle</option>
           <option value="static">4:3</option>
           <option value="plain">Code only</option>
         </select>
-      </label>
-      <label class="field">Dots
-        <select id="dots">
+      </div>
+      <div class="opt"><span>Dots</span><div class="seg icons" id="g_dots"></div>
+        <select id="dots" hidden>
           <option value="round" selected>Round</option>
           <option value="square">Square</option>
         </select>
-      </label>
+      </div>
     </div>
 
     <div class="row">
@@ -299,27 +305,27 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
       <label class="field">Camera
         <select id="cam"><option value="">Rear (auto)</option></select>
       </label>
-      <label class="field">Decoder
-        <select id="decoder">
+      <div class="opt"><span>Decoder</span><div class="seg icons" id="g_decoder"></div>
+        <select id="decoder" hidden>
           <option value="zxing" selected>ZXing (recommended)</option>
           <option value="jsqr">jsQR (QR only)</option>
         </select>
-      </label>
-      <label class="field">Scan resolution
-        <select id="res">
+      </div>
+      <div class="opt"><span>Resolution</span><div class="seg icons" id="g_res"></div>
+        <select id="res" hidden>
           <option value="800">800 px</option>
           <option value="1200" selected>1200 px</option>
           <option value="1600">1600 px</option>
         </select>
-      </label>
-      <label class="field">Center crop
-        <select id="crop">
+      </div>
+      <div class="opt"><span>Center crop</span><div class="seg icons" id="g_crop"></div>
+        <select id="crop" hidden>
           <option value="1" selected>Off</option>
           <option value="1.5">1.5×</option>
           <option value="2">2×</option>
           <option value="3">3×</option>
         </select>
-      </label>
+      </div>
     </div>
     <button class="go" id="rxBtn">Start receiving</button>
     <p class="err" id="rxErr"></p>
@@ -434,6 +440,34 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') for (const e
 $('#txFull').onclick = () => toggleFull('txStage');
 $('#rxFull').onclick = () => toggleFull('rxStage');
 
+/* ---------- v3.14 選択項目をアイコン付きボタンに ----------
+   select は隠したまま値の置き場として残し（既存コードは select.value を読む）、ボタンが select.value を変えて change を起こす */
+const ICONS = {
+  src:   { mic:'<path d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3z"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6"/>', file:'<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M10 16.5a1.5 1.5 0 1 0 3 0V11l3-1"/>' },
+  codec: { adpcm:'<path d="M3 15h3v-6h3v9h3V6h3v12h3v-6h3"/>', opus12:'<path d="M3 12c2-6 4-6 6 0s4 6 6 0 4-6 6 0"/>', opus16:'<path d="M3 12c1.5-8 3-8 4.5 0s3 8 4.5 0 3-8 4.5 0 3 8 4.5 0"/>' },
+  code:  { qr:'<path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2z"/>', aztec:'<path d="M4 4h16v16H4z"/><path d="M8 8h8v8H8z"/><path d="M11 11h2v2h-2z"/>' },
+  look:  { record:'<circle cx="12" cy="12" r="8.5"/>', static:'<rect x="3" y="5.5" width="18" height="13.5"/>', plain:'<rect x="5" y="5" width="14" height="14"/>' },
+  dots:  { round:'<circle cx="8" cy="8" r="2.2"/><circle cx="16" cy="8" r="2.2"/><circle cx="8" cy="16" r="2.2"/><circle cx="16" cy="16" r="2.2"/>', square:'<rect x="5.5" y="5.5" width="4.5" height="4.5"/><rect x="14" y="5.5" width="4.5" height="4.5"/><rect x="5.5" y="14" width="4.5" height="4.5"/><rect x="14" y="14" width="4.5" height="4.5"/>' },
+  decoder: { zxing:'<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 12h8M12 8v8"/>', jsqr:'<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 15l3-6 3 6M15 9v6"/>' },
+  res:   { 800:'<rect x="6" y="7" width="12" height="10"/>', 1200:'<rect x="4" y="6" width="16" height="12"/>', 1600:'<rect x="2.5" y="4.5" width="19" height="15"/>' },
+  crop:  { 1:'<rect x="4" y="4" width="16" height="16"/>', 1.5:'<rect x="4" y="4" width="16" height="16"/><rect x="7" y="7" width="10" height="10"/>', 2:'<rect x="4" y="4" width="16" height="16"/><rect x="8" y="8" width="8" height="8"/>', 3:'<rect x="4" y="4" width="16" height="16"/><rect x="9.5" y="9.5" width="5" height="5"/>' },
+};
+const SHORT = { 'Microphone':'Mic', 'Audio file (loop)':'File', 'Opus 12k (PC only)':'Opus 12k', 'Opus 16k (PC only)':'Opus 16k', 'Aztec 2×2 (experimental)':'Aztec', 'ZXing (recommended)':'ZXing', 'jsQR (QR only)':'jsQR', 'Code only':'Code', '800 px':'800', '1200 px':'1200', '1600 px':'1600' };
+function buildIcons(id){
+  const sel = $('#' + id), box = $('#g_' + id); if (!box) return;
+  box.replaceChildren();
+  for (const o of sel.options){
+    const b = document.createElement('button'); b.type = 'button'; b.dataset.v = o.value; b.disabled = o.disabled;
+    const ic = (ICONS[id] || {})[o.value];
+    b.innerHTML = (ic ? '<svg viewBox="0 0 24 24" aria-hidden="true">' + ic + '</svg>' : '') + '<span>' + (SHORT[o.text] || o.text) + '</span>';
+    b.onclick = () => { if (sel.value === o.value) return; sel.value = o.value; syncIcons(id); if (sel.onchange) sel.onchange(); sel.dispatchEvent(new Event('change')); };
+    box.appendChild(b);
+  }
+  syncIcons(id);
+}
+function syncIcons(id){ const sel = $('#' + id), box = $('#g_' + id); if (!box) return; for (const b of box.children){ b.setAttribute('aria-pressed', b.dataset.v === sel.value); b.disabled = sel.options[[...sel.options].findIndex(o => o.value === b.dataset.v)]?.disabled || false; } }
+const ICON_SELECTS = ['src','codec','code','look','dots','decoder','res','crop'];
+
 /* ---------- v3.12 ページ共有 QR ----------
    このページのアドレス（クエリやハッシュは除く）を QR にして重ねて表示する。送信用の QR とは無関係。
    qrcode-generator は既に読み込んでいるのでそれを使う */
@@ -462,6 +496,7 @@ if (!hasWC){
   for (const o of $('#codec').options) if (o.value.startsWith('opus')) o.disabled = true;
   $('#codec').value = 'adpcm';
 }
+for (const id of ICON_SELECTS) buildIcons(id);
 function applyLook(){
   const look = $('#look').value;
   $('#qr').classList.toggle('plain', look === 'plain');
@@ -826,7 +861,7 @@ function drawCode(t, bytes){
   if (!isAztec()) return drawQR(t, bytes);
   if (typeof ZXingWASM === 'undefined' || !ZXingWASM.writeBarcode){
     $('#txErr').textContent = 'ZXing writer not loaded; Aztec unavailable. Switching to QR.';
-    $('#code').value = 'qr'; applyLook(); return;
+    $('#code').value = 'qr'; syncIcons('code'); applyLook(); return;
   }
   const pkts = Array.isArray(bytes) ? bytes : [bytes];
   const seq = t.drawSeq = (t.drawSeq || 0) + 1;
@@ -954,7 +989,7 @@ async function startRx(){
     r.dec.configure({ codec:'opus', sampleRate:48000, numberOfChannels:1 });
   }
   r.zx = typeof ZXingWASM !== 'undefined';
-  if (!r.zx){ $('#decoder').value = 'jsqr'; $('#decoder').disabled = true; }
+  if (!r.zx){ $('#decoder').value = 'jsqr'; for (const b of $('#g_decoder').children) b.disabled = true; syncIcons('decoder'); }
   const loop = async () => {
     if (rx !== r) return;
     if (!r.busy){ r.busy = true; try { await scan(r); } catch {} r.busy = false; }
