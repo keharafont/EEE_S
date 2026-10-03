@@ -62,8 +62,12 @@ details .row{margin-top:10px}
 .stage{position:relative; background:#fff; border-radius:12px; padding:12px; display:flex; justify-content:center; align-items:center; min-height:200px; border:3px solid transparent; transition:border-color .12s, background-color .3s}
 .stage.hit{border-color:var(--accent)}
 .stage.vinyl{background:#0b0908}
-#qr{width:100%; max-width:min(92vw,560px); aspect-ratio:1; display:block; transform-origin:50% 50%}
+/* v3.3: 盤の装飾（#disc）とシンボル（#qr）を重ねる。装飾だけ CSS で連続回転させ、シンボルは静止 */
+#wrap{position:relative; width:100%; max-width:min(92vw,560px); aspect-ratio:1}
+#wrap canvas{position:absolute; inset:0; width:100%; height:100%; display:block; transform-origin:50% 50%}
 #qr.plain{image-rendering:pixelated}
+@keyframes spin{to{transform:rotate(360deg)}}
+#disc.spin{animation:spin var(--spin,1.8s) linear infinite}
 /* v3: 回転はCSSアニメーションではなく、QR切り替えごとの離散回転（コマ送り）。表示中は静止させて動きブレを避ける */
 .stage.cam{background:#000; padding:0; overflow:hidden}
 video{width:100%; display:block; max-height:60vh; object-fit:contain}
@@ -208,7 +212,10 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
     <button class="go" id="txBtn">送信を開始</button>
     <p class="err" id="txErr"></p>
     <div class="stage" id="txStage">
-      <canvas id="qr" hidden></canvas>
+      <div id="wrap" hidden>
+        <canvas id="disc" hidden></canvas>
+        <canvas id="qr"></canvas>
+      </div>
       <div class="idle" id="txIdle">ここにコードが表示されます</div>
     </div>
     <div class="meter" aria-hidden="true"><i id="lvl"></i></div>
@@ -339,20 +346,24 @@ function applyLook(){
   const cv = $('#qr'), rpm = +$('#rpm').value, record = $('#look').value === 'record';
   cv.classList.toggle('plain', !record);
   if (!record || rpm === 0){ spinAngle = 0; }
-  /* Aztec は canvas の中で回す（下記）ので CSS の回転は使わない */
+  /* Aztec はシンボルを回さない（下記）ので CSS の回転は使わない */
   if (!record || rpm === 0 || isAztec()) cv.style.transform = '';
   $('#txStage').classList.toggle('vinyl', record);
+  /* Aztec のとき盤の装飾レイヤーを実際の回転数で連続回転させる。シンボルではないので動きブレは構わない */
+  const disc = $('#disc'), spin = isAztec() && record && rpm > 0;
+  disc.hidden = !(isAztec() && record);
+  disc.classList.toggle('spin', spin);
+  if (spin) disc.style.setProperty('--spin', (60 / rpm).toFixed(3) + 's');
 }
-/* コードが切り替わる瞬間だけ盤を回す。表示中は静止（カメラの露光中に像が流れない）。
-   QR: canvas ごと CSS で回す。
+/* QR: コードが切り替わる瞬間だけ canvas ごと CSS で回す（コマ送り）。表示中は静止（カメラの露光中に像が流れない）。
    Aztec: ZXing の Aztec 検出は 0°/90° から ±20° までは全条件で読めるが 45° 付近はモジュールが小さいと落ちる（Node で測定）。
-   33rpm×0.24秒 ≒ 47.5°/枚 で最悪の角度を踏むので、シンボルは 90° 刻みに丸め、装飾（埋めドット）だけを自由な角度で回す。
-   中身は毎枚変わるのでシンボルが回って見えることはなく、回転の手がかりは装飾側で十分 */
+   33rpm×0.24秒 ≒ 47.5°/枚 で最悪の角度を踏むので、シンボルは回さず、盤の装飾レイヤー（#disc）だけを CSS で連続回転させる。
+   中身は毎枚変わるのでシンボルが回って見えることはなく、回転の手がかりは装飾側で作る */
 function stepSpin(t){
   const cv = $('#qr'), rpm = +$('#rpm').value, record = $('#look').value === 'record';
-  if (!record || rpm === 0) return;
+  if (!record || rpm === 0 || isAztec()) return;
   spinAngle = (spinAngle + 360 * t.cfg.chunk * rpm / 60) % 360;
-  if (!isAztec()) cv.style.transform = 'rotate(' + spinAngle.toFixed(2) + 'deg)';
+  cv.style.transform = 'rotate(' + spinAngle.toFixed(2) + 'deg)';
 }
 for (const id of ['look','rpm','dots','tone','fill']) $('#' + id).onchange = () => { applyLook(); if (tx_ && tx_.lastPkt) drawCode(tx_, tx_.lastPkt); };
 applyLook();
@@ -578,7 +589,7 @@ function drawQR(t, bytes){
     g.fillStyle = ink;
     drawModules(g, qr, m, ox + q * scale, oy + q * scale, scale, round);
   }
-  cv.hidden = false; $('#txIdle').hidden = true;
+  $('#wrap').hidden = false; $('#txIdle').hidden = true;
   $('#sVer').textContent = (m - 17) / 4;
   $('#sBytes').textContent = bytes.length;
   $('#sMod').textContent = m + '×' + m;
@@ -655,41 +666,54 @@ function drawAztec(t, M, nbytes){
   } else {
     const S = 1000;
     if (cv.width !== S){ cv.width = cv.height = S; }
-    g.clearRect(0, 0, S, S);
     const cx = S / 2, cy = S / 2;
     const scale = Math.max(2, Math.floor(Math.floor(S / 1.4) / n)), side = n * scale, R = side / 2;
     const labelR = Math.min(S / 2 - 14, R + 60);
-    g.fillStyle = '#0e0b09'; g.beginPath(); g.arc(cx, cy, S / 2 - 2, 0, Math.PI * 2); g.fill();
-    g.strokeStyle = 'rgba(255,255,255,0.07)'; g.lineWidth = 1.2;
-    for (let r = labelR + 10; r < S / 2 - 12; r += 5){ g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke(); }
-    g.strokeStyle = 'rgba(255,255,255,0.16)'; g.lineWidth = 2;
-    for (const r of [labelR + 4, S / 2 - 8]){ g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke(); }
-    g.fillStyle = paper; g.beginPath(); g.arc(cx, cy, labelR, 0, Math.PI * 2); g.fill();
-    /* 装飾（埋めドットの環）は自由な角度で回す */
-    if ($('#fill').value === 'dots'){
-      g.save(); g.translate(cx, cy); g.rotate(spinAngle * Math.PI / 180);
-      let seed = 7; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
-      const inner = (R + scale) * (R + scale), outer = (labelR - scale) * (labelR - scale), ext = Math.ceil(labelR / scale) + 1;
-      g.fillStyle = ink; g.globalAlpha = 0.3;
-      for (let r = -ext; r <= ext; r++) for (let c = -ext; c <= ext; c++){
-        const x = c * scale + scale / 2, y = r * scale + scale / 2, d2 = x * x + y * y;
-        if (d2 < inner || d2 > outer || rnd() >= 0.5) continue;
-        if (round){ g.beginPath(); g.arc(x, y, scale * 0.6, 0, Math.PI * 2); g.fill(); }
-        else g.fillRect(x - scale / 2, y - scale / 2, scale, scale);
-      }
-      g.restore();
-    }
-    /* シンボルは 90° 刻み。真円で切り抜く */
-    const symAngle = Math.round(spinAngle / 90) * 90;
-    g.save(); g.translate(cx, cy); g.rotate(symAngle * Math.PI / 180);
-    g.beginPath(); g.arc(0, 0, R, 0, Math.PI * 2); g.clip();
-    g.fillStyle = ink; aztecModules(g, M, -side / 2, -side / 2, scale, round);
+    /* 盤の装飾は別 canvas（#disc）。幾何や見た目が変わったときだけ描き直す。回転は CSS（applyLook） */
+    const key = [S, R, scale, labelR, round, sepia, $('#fill').value].join('|');
+    if (t.discKey !== key){ drawDisc(S, R, scale, labelR, ink, paper, round); t.discKey = key; }
+    /* シンボル層：円の外は透明。シンボルは回さない */
+    g.clearRect(0, 0, S, S);
+    g.save(); g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.clip();
+    g.fillStyle = paper; g.fillRect(cx - R, cy - R, side, side);
+    g.fillStyle = ink; aztecModules(g, M, cx - side / 2, cy - side / 2, scale, round);
     g.restore();
   }
-  cv.hidden = false; $('#txIdle').hidden = true;
+  $('#wrap').hidden = false; $('#txIdle').hidden = true;
   $('#sVer').textContent = 'Aztec';
   $('#sBytes').textContent = nbytes;
   $('#sMod').textContent = n + '×' + n;
+}
+/* 盤の装飾層（Aztec のとき）。黒い盤・溝・盤面の艶・ラベル円・埋めドットの環。
+   この層は CSS で実際の回転数で回り続けるので、回転の手がかり（動く模様）はここで作る。
+   埋めドットはシンボルの縁 +1 モジュールの外側から始めて、復号に影響しない */
+function drawDisc(S, R, scale, labelR, ink, paper, round){
+  const cv = $('#disc'), g = cv.getContext('2d'), cx = S / 2, cy = S / 2;
+  if (cv.width !== S){ cv.width = cv.height = S; }
+  g.clearRect(0, 0, S, S);
+  g.fillStyle = '#0e0b09'; g.beginPath(); g.arc(cx, cy, S / 2 - 2, 0, Math.PI * 2); g.fill();
+  /* 艶：盤面に差す光の反射（向かい合う2方向にうっすら）。回ると光が流れて見える */
+  if (g.createConicGradient){ /* 古い Safari には無い。無ければ艶なし */
+    const sheen = g.createConicGradient(0, cx, cy);
+    for (let i = 0; i <= 8; i++) sheen.addColorStop(i / 8, (i % 4 === 1) ? 'rgba(255,255,255,0.045)' : 'rgba(255,255,255,0)');
+    g.fillStyle = sheen; g.beginPath(); g.arc(cx, cy, S / 2 - 2, 0, Math.PI * 2); g.fill();
+  }
+  g.strokeStyle = 'rgba(255,255,255,0.07)'; g.lineWidth = 1.2;
+  for (let r = labelR + 10; r < S / 2 - 12; r += 5){ g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke(); }
+  g.strokeStyle = 'rgba(255,255,255,0.16)'; g.lineWidth = 2;
+  for (const r of [labelR + 4, S / 2 - 8]){ g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke(); }
+  g.fillStyle = paper; g.beginPath(); g.arc(cx, cy, labelR, 0, Math.PI * 2); g.fill();
+  if ($('#fill').value !== 'dots') return;
+  let seed = 7; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  const inner = (R + scale) * (R + scale), outer = (labelR - scale) * (labelR - scale), ext = Math.ceil(labelR / scale) + 1;
+  g.save(); g.translate(cx, cy); g.fillStyle = ink; g.globalAlpha = 0.3;
+  for (let r = -ext; r <= ext; r++) for (let c = -ext; c <= ext; c++){
+    const x = c * scale + scale / 2, y = r * scale + scale / 2, d2 = x * x + y * y;
+    if (d2 < inner || d2 > outer || rnd() >= 0.5) continue;
+    if (round){ g.beginPath(); g.arc(x, y, scale * 0.6, 0, Math.PI * 2); g.fill(); }
+    else g.fillRect(x - scale / 2, y - scale / 2, scale, scale);
+  }
+  g.restore();
 }
 function aztecModules(g, M, ox, oy, scale, round){
   const n = M.length, rad = scale * 0.6;
@@ -705,7 +729,7 @@ function aztecModules(g, M, ox, oy, scale, round){
 function stopTx(){
   const t = tx_; tx_ = null;
   $('#txBtn').textContent = '送信を開始'; $('#txBtn').classList.remove('stop');
-  $('#qr').hidden = true; $('#qr').style.transform = ''; spinAngle = 0; $('#txIdle').hidden = false; $('#lvl').style.width = '0';
+  $('#wrap').hidden = true; $('#qr').style.transform = ''; spinAngle = 0; $('#txIdle').hidden = false; $('#lvl').style.width = '0';
   if (!t) return;
   clearInterval(t.timer);
   try { t.nodes?.forEach(n => n.disconnect()); } catch {}
