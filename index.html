@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>映すラジオ — Projected Radio v3.12</title>
+<title>映すラジオ — Projected Radio v3.13</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Noto+Serif:wght@400;700&display=swap" rel="stylesheet">
@@ -160,7 +160,7 @@ video{width:100%; display:block; max-height:60vh; object-fit:contain}
       <div class="hint">Scan to open this page on a phone. Tap anywhere to close.</div>
     </div>
   </div>
-  <p class="lede">Sound carried only by the light of a QR code on a screen. No network. <span class="v">v3.12</span></p>
+  <p class="lede">Sound carried only by the light of a QR code on a screen. No network. <span class="v">v3.13</span></p>
 
   <div class="seg" role="group" aria-label="Mode">
     <button id="tabTx" aria-pressed="true">Transmit</button>
@@ -571,13 +571,34 @@ function parsePacket(b){
 /* ---------- sender ---------- */
 $('#txBtn').onclick = () => tx_ ? stopTx() : startTx().catch(e => { $('#txErr').textContent = 'Could not start: ' + (e.message || e); stopTx(); });
 
+/* ---------- v3.13 フェード中はダミー ----------
+   コード層のフェード（1.6 秒）のあいだに映る枚はカメラがほぼ読めない。そこに本物を流すと、その分の音が抜ける。
+   なので開始時はダミーの枚（ヘッダだけでチャンク数 0。受信側の既存判定で捨てられる。本物と同じ長さにして見た目を揃え、中身は毎枚乱数）
+   を映してフェードインし、完全に映ってから音源の取り込み（ファイルなら再生開始）を始める。
+   停止時は逆：先に音源を止めてダミーに切り替え、ダミーのままフェードアウトしてから AudioContext を閉じる */
+const FADE_MS = 1700;
+let fade = null;   /* { dummy: interval, timer: timeout, t } */
+function clearFade(){ if (!fade) return; clearInterval(fade.dummy); clearTimeout(fade.timer); if (fade.closeCtx) fade.t.ctx.close().catch(() => {}); fade = null; }
+function dummyPacket(t){
+  const n = Math.max(5, packetBytes(t.cfg, t.mode)), out = new Uint8Array(n);
+  out[0] = 0x52; out[1] = t.codec; out[2] = Math.round((t.codec === CODEC_ADPCM ? t.cfg.rate : 48000) / 250) & 0xff; out[3] = Math.round(t.cfg.buf * 10) & 0xff; out[4] = 0;
+  for (let i = 5; i < n; i++) out[i] = Math.random() * 256 | 0;
+  return out;
+}
+function startDummy(t, closeCtx){
+  clearFade(); fade = { t, closeCtx };
+  const tick = () => { t.lastPkt = isAztec() ? Array.from({ length: AZ_N }, () => dummyPacket(t)) : dummyPacket(t); drawCode(t, t.lastPkt); };
+  tick(); fade.dummy = setInterval(tick, t.cfg.chunk * 1000 * (isAztec() ? AZ_N : 1));
+}
+
 async function startTx(){
   $('#txErr').textContent = '';
+  clearFade();   /* 停止のフェードアウト中に再開したら、それを打ち切る */
   const mode = $('#codec').value, cfg = readCfg();
   const codec = mode === 'adpcm' ? CODEC_ADPCM : CODEC_OPUS;
   const ctx = new AudioContext({ sampleRate: 48000 });
   await ctx.resume();
-  const t = tx_ = { ctx, codec, cfg, seq: 0, hist: [], qrCount: 0, t0: performance.now(), level: 0, fixedVer: 0 };
+  const t = tx_ = { ctx, codec, mode, cfg, seq: 0, hist: [], qrCount: 0, t0: performance.now(), level: 0, fixedVer: 0, live: false };
   $('#txBtn').textContent = 'Stop transmitting'; $('#txBtn').classList.add('stop');
 
   let srcNode;
@@ -588,7 +609,7 @@ async function startTx(){
     const f = $('#file').files[0];
     if (!f) throw new Error('Choose an audio file');
     const buf = await ctx.decodeAudioData(await f.arrayBuffer());
-    srcNode = ctx.createBufferSource(); srcNode.buffer = buf; srcNode.loop = true; srcNode.start();
+    srcNode = ctx.createBufferSource(); srcNode.buffer = buf; srcNode.loop = true; t.fileSrc = srcNode;   /* 再生開始はフェード完了後 */
     if ($('#monitor').checked) srcNode.connect(ctx.destination);
   }
   const proc = ctx.createScriptProcessor(2048, 1, 1);
@@ -598,6 +619,7 @@ async function startTx(){
 
   const rateForHeader = codec === CODEC_ADPCM ? cfg.rate : 48000;
   const emit = data => {
+    if (!t.live) return;   /* フェードイン中はダミーを映しているので捨てる */
     const cur = { seq: t.seq & 0xffff, data }; t.seq++;
     t.hist.unshift(cur); if (t.hist.length > cfg.red) t.hist.length = cfg.red;
     const pkt = buildPacket(codec, rateForHeader, cfg.buf, t.hist);
@@ -649,6 +671,13 @@ async function startTx(){
     };
   }
   setHiss(t, $('#hiss').checked);
+  /* ダミーでフェードイン → 完全に映ってから本番 */
+  startDummy(t, false);
+  fade.timer = setTimeout(() => {
+    clearInterval(fade.dummy); fade = null;
+    t.live = true; t.t0 = performance.now(); t.qrCount = 0;
+    try { t.fileSrc?.start(); } catch {}
+  }, FADE_MS);
   try { t.wake = await navigator.wakeLock?.request('screen'); } catch {}
   t.timer = setInterval(() => {
     const sec = (performance.now() - t.t0) / 1000;
@@ -723,7 +752,7 @@ function drawQR(t, bytes){
     g.fillStyle = paper; g.beginPath(); g.arc(cx, cy, labelR, 0, Math.PI * 2); g.fill();
     drawQRCamo(g, qr, m, cx, cy, block / m, labelR, ink, round, t.qrCount || 0);
   }
-  $('#qr').classList.add('on');
+  if (!t.stopping) $('#qr').classList.add('on');
   $('#sVer').textContent = (m - 17) / 4;
   $('#sBytes').textContent = bytes.length;
   $('#sMod').textContent = m + '×' + m;
@@ -801,7 +830,7 @@ function drawCode(t, bytes){
   const pkts = Array.isArray(bytes) ? bytes : [bytes];
   const seq = t.drawSeq = (t.drawSeq || 0) + 1;
   Promise.all(pkts.map(aztecMatrix)).then(Ms => {
-    if (t.drawSeq !== seq || tx_ !== t) return;   /* 生成中に次の枚が来ていたら捨てる */
+    if (t.drawSeq !== seq || t.dead) return;   /* 生成中に次の枚が来ていたら捨てる */
     $('#txErr').textContent = '';
     drawAztec(t, Ms, pkts.reduce((a, b) => a + b.length, 0), seq);
   }).catch(e => { $('#txErr').textContent = 'Does not fit in Aztec. Shorten the chunk.'; });
@@ -845,7 +874,7 @@ function drawAztec(t, Ms, nbytes, frame){
     }
     for (const p of place(o, scale)) aztecModules(g, p.M, p.x, p.y, scale, round);
   }
-  $('#qr').classList.add('on');
+  if (!t.stopping) $('#qr').classList.add('on');
   $('#sVer').textContent = 'Aztec×' + Ms.length;
   $('#sBytes').textContent = nbytes;
   $('#sMod').textContent = n + '×' + n + '×' + Ms.length;
@@ -885,15 +914,20 @@ function aztecModules(g, M, ox, oy, scale, round){
 function stopTx(){
   const t = tx_; tx_ = null;
   $('#txBtn').textContent = 'Start transmitting'; $('#txBtn').classList.remove('stop');
-  $('#qr').classList.remove('on'); $('#lvl').style.width = '0';
-  if (!t) return;
+  $('#lvl').style.width = '0';
+  if (!t){ $('#qr').classList.remove('on'); clearFade(); return; }
   clearInterval(t.timer);
+  t.live = false;
   setHiss(t, false);
   try { t.nodes?.forEach(n => n.disconnect()); } catch {}
   try { t.enc?.close(); } catch {}
   t.stream?.getTracks().forEach(tr => tr.stop());
   t.wake?.release?.().catch(() => {});
-  t.ctx.close().catch(() => {});
+  /* 先に音源を止め、ダミーに切り替えてからフェードアウト。終わったら AudioContext を閉じる */
+  t.stopping = true;
+  $('#qr').classList.remove('on');
+  startDummy(t, true);
+  fade.timer = setTimeout(() => { t.dead = true; clearFade(); }, FADE_MS);
 }
 
 /* ---------- receiver ---------- */
